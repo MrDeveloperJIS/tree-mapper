@@ -43,9 +43,17 @@ Snapshots are saved to `.tree/yyyy-mm-dd-hh-mm-ss.md` inside the target folder. 
 
 Each snapshot contains:
 
-1. **Metadata header** — timestamp (local time + timezone), file count, size limit
+1. **Metadata header** — timestamp (local time + timezone), file count, total repo size
 2. **Project tree** — full CLI-style directory hierarchy
 3. **File contents** — every included file with its source in a fenced code block
+
+Example header:
+
+```
+> **Generated:** 2026 04 11 11:49:10 PM UTC+6
+> **Files included:** 14
+> **Repo size:** 48.30 KB
+```
 
 ## Ignore Rules
 
@@ -58,7 +66,7 @@ private/*
 *.lock
 ```
 
-These patterns always ignored regardless of `.treeignore`:
+These patterns are always ignored regardless of `.treeignore`:
 
 | Pattern | Reason |
 |---------|--------|
@@ -66,7 +74,8 @@ These patterns always ignored regardless of `.treeignore`:
 | `.git/**` | Version control |
 | `dist/**`, `build/**` | Build output |
 | `**/*.log` | Log files |
-| `.tree/**`, `.treeignore` | Snapshot output folder |
+| `.tree/**` | Snapshot output folder |
+| `.treeignore` | Ignore rules file |
 
 ## Git Integration
 
@@ -91,21 +100,22 @@ Open VS Code Settings (`Ctrl+,`) and search for **Tree Mapper**:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `treemapper.additionalIgnorePatterns` | `[]` | Extra glob patterns to ignore (in addition to `.treeignore`) |
-| `treemapper.maxFileSizeKB` | `2048` | Skip files larger than this size in KB (default: 2 MB) |
+| `treemapper.maxFileSizeKB` | `2048` | Skip files larger than this size in KB — excluded files are not counted in repo size |
 
 ## Installation
 
-### From GitHub Releases
+1. Download `tree-mapper-x.x.x.vsix` from the [Releases page](https://github.com/MrDeveloperJIS/tree-mapper/releases)
 
-1. Download `tree-mapper-x.x.x.vsix` from the [Releases page](https://github.com/MrDeveloperJIS/vs_code-tree_mapper/releases)
+**Via VS Code UI:**
+
 2. Open the **Extensions** panel (`Ctrl+Shift+X`)
 3. Click the `⋯` menu → **Install from VSIX…**
 4. Select the downloaded file and reload VS Code
 
-### Via terminal
+**Via terminal** (after downloading):
 
 ```bash
-code --install-extension tree-mapper-x.x.x.vsix
+code --install-extension path/to/tree-mapper-x.x.x.vsix
 ```
 
 ## Requirements

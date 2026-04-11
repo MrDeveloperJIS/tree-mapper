@@ -2,9 +2,6 @@
 
 const path = require('path');
 
-/**
- * Maps file extensions to Markdown fenced code block language identifiers.
- */
 const EXT_TO_LANG = {
   // Web
   '.js': 'javascript',
@@ -97,7 +94,6 @@ const EXT_TO_LANG = {
   '.liquid': 'liquid',
 };
 
-// Files with no extension but a known name
 const NAME_TO_LANG = {
   'Dockerfile': 'dockerfile',
   'Makefile': 'makefile',
@@ -110,16 +106,9 @@ const NAME_TO_LANG = {
   '.htaccess': 'apache',
 };
 
-/**
- * Infers a Markdown code fence language from a file path.
- *
- * @param {string} filePath - Relative or absolute file path
- * @returns {string}        - Language identifier (empty string if unknown)
- */
 function getLanguage(filePath) {
   const base = path.basename(filePath);
   const ext = path.extname(filePath).toLowerCase();
-
   if (NAME_TO_LANG[base]) return NAME_TO_LANG[base];
   if (ext && EXT_TO_LANG[ext]) return EXT_TO_LANG[ext];
   return '';

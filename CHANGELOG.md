@@ -4,6 +4,14 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v1.1.2 — 2026-04-11
+
+### Changed
+- Snapshot header now shows **Repo size** (total combined size of all included files) instead of the max file size limit
+- Repo size is formatted as `KB` for values under 1 MB, and `MB` otherwise (2 decimal places)
+
+---
+
 ## v1.1.1 — 2026-04-11
 
 ### Added
