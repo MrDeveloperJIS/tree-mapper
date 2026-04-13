@@ -4,6 +4,15 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v1.2.0 — 2026-04-14
+
+### Added
+- **Snapshot rotation** — New `treemapper.keepLastSnapshots` setting (default: `10`) automatically deletes the oldest snapshots in `.tree/` after each run, keeping only the N most recent
+- **Configurable default ignore patterns** — New `treemapper.defaultIgnorePatterns` setting controls what gets written into `.treeignore` when it is auto-created on first run; has no effect once `.treeignore` already exists
+- **Published to the VS Code Marketplace** — Tree Mapper is now available directly via the Extensions panel (`Ctrl+Shift+X`) or at [marketplace.visualstudio.com](https://marketplace.visualstudio.com/items?itemName=MrDeveloperJIS.tree-mapper)
+
+---
+
 ## v1.1.2 — 2026-04-11
 
 ### Changed
@@ -19,7 +28,7 @@ All notable changes to Tree Mapper are documented here.
 - Creates `.gitignore` if it doesn't exist yet (but `.git` folder is present)
 - Appends `.tree/` and `.treeignore` entries independently — only adds whichever are missing, no duplicates
 - Uses exact line matching to avoid false positives from substrings (e.g. `.treeignore-backup`)
-- Entries are written under a `# Tree Mapper Snapshots` comment block
+- Entries are written under a `# Tree Mapper` comment block
 
 ---
 

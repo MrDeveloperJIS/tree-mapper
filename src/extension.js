@@ -14,12 +14,7 @@ function activate(context) {
 
     if (uri && uri.fsPath) {
       const stat = fs.statSync(uri.fsPath);
-      if (stat.isDirectory()) {
-        rootPath = uri.fsPath;
-      } else {
-        // uri is a file — use its parent
-        rootPath = path.dirname(uri.fsPath);
-      }
+      rootPath = stat.isDirectory() ? uri.fsPath : path.dirname(uri.fsPath);
     } else {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -30,8 +25,20 @@ function activate(context) {
     }
 
     const config = vscode.workspace.getConfiguration('treemapper');
-    const extraIgnore = config.get('additionalIgnorePatterns') || [];
     const maxFileSizeKB = config.get('maxFileSizeKB') || 2048;
+    const keepLastSnapshots = config.get('keepLastSnapshots') || 10;
+    const defaultIgnorePatterns = config.get('defaultIgnorePatterns') || [];
+
+    const treeignorePath = path.join(rootPath, '.treeignore');
+    if (!fs.existsSync(treeignorePath)) {
+      const content = [
+        '# Tree Mapper ignore rules — gitignore syntax',
+        '',
+        ...defaultIgnorePatterns,
+        '',
+      ].join('\n');
+      fs.writeFileSync(treeignorePath, content, 'utf8');
+    }
 
     let outFile = null;
 
@@ -44,10 +51,9 @@ function activate(context) {
       async (progress) => {
         progress.report({ message: 'Scanning workspace files…' });
 
-        let files;
-        let totalSizeBytes;
+        let files, totalSizeBytes, skippedCount = 0;
         try {
-          ({ files, totalSizeBytes } = await scanWorkspace(rootPath, extraIgnore, maxFileSizeKB));
+          ({ files, totalSizeBytes, skippedCount } = await scanWorkspace(rootPath, maxFileSizeKB));
         } catch (err) {
           vscode.window.showErrorMessage(`Tree Mapper scan error: ${err.message}`);
           return;
@@ -57,42 +63,14 @@ function activate(context) {
         const treeLines = buildTree(files);
 
         progress.report({ message: 'Rendering Markdown snapshot…' });
-        const markdown = renderMarkdown(rootPath, treeLines, files, totalSizeBytes);
+        const markdown = renderMarkdown(rootPath, treeLines, files, totalSizeBytes, skippedCount);
 
         const outDir = path.join(rootPath, '.tree');
         if (!fs.existsSync(outDir)) {
           fs.mkdirSync(outDir, { recursive: true });
         }
 
-        const treeignorePath = path.join(rootPath, '.treeignore');
-        if (!fs.existsSync(treeignorePath)) {
-          fs.writeFileSync(treeignorePath, '', 'utf8');
-        }
-
-        const gitDir = path.join(rootPath, '.git');
-        if (fs.existsSync(gitDir) && fs.statSync(gitDir).isDirectory()) {
-          const gitignorePath = path.join(rootPath, '.gitignore');
-
-          let existing = '';
-          if (fs.existsSync(gitignorePath)) {
-            existing = fs.readFileSync(gitignorePath, 'utf8');
-          }
-
-          const existingLines = existing.split(/\r?\n/);
-          const hasTree = existingLines.includes('.tree/');
-          const hasTreeignore = existingLines.includes('.treeignore');
-
-          if (!hasTree && !hasTreeignore) {
-            const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
-            fs.writeFileSync(gitignorePath, existing + separator + '# Tree Mapper Snapshots\n.tree/\n.treeignore\n', 'utf8');
-          } else if (!hasTree) {
-            const updated = existing.replace(/^\.treeignore$/m, '.tree/\n.treeignore');
-            fs.writeFileSync(gitignorePath, updated, 'utf8');
-          } else if (!hasTreeignore) {
-            const updated = existing.replace(/^\.tree\/$/m, '.tree/\n.treeignore');
-            fs.writeFileSync(gitignorePath, updated, 'utf8');
-          }
-        }
+        syncGitignore(rootPath);
 
         const timestamp = getTimestamp();
         outFile = path.join(outDir, `${timestamp}.md`);
@@ -104,6 +82,8 @@ function activate(context) {
           outFile = null;
           return;
         }
+
+        pruneSnapshots(outDir, keepLastSnapshots);
       }
     );
 
@@ -124,21 +104,51 @@ function activate(context) {
   context.subscriptions.push(disposable);
 }
 
-function deactivate() { }
+function syncGitignore(rootPath) {
+  const gitDir = path.join(rootPath, '.git');
+  if (!fs.existsSync(gitDir) || !fs.statSync(gitDir).isDirectory()) return;
 
-// yyyy-mm-dd-hh-mm-ss using device local time (24-hour, filesystem-safe)
+  const gitignorePath = path.join(rootPath, '.gitignore');
+  let existing = fs.existsSync(gitignorePath)
+    ? fs.readFileSync(gitignorePath, 'utf8')
+    : '';
+
+  const lines = existing.split(/\r?\n/);
+  const hasTree = lines.includes('.tree/');
+  const hasTreeignore = lines.includes('.treeignore');
+
+  if (hasTree && hasTreeignore) return;
+
+  if (!hasTree && !hasTreeignore) {
+    const sep = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+    fs.writeFileSync(gitignorePath, existing + sep + '# Tree Mapper\n.tree/\n.treeignore\n', 'utf8');
+  } else if (!hasTree) {
+    fs.writeFileSync(gitignorePath, existing.replace(/^\.treeignore$/m, '.tree/\n.treeignore'), 'utf8');
+  } else {
+    fs.writeFileSync(gitignorePath, existing.replace(/^\.tree\/$/m, '.tree/\n.treeignore'), 'utf8');
+  }
+}
+
+function pruneSnapshots(outDir, keepLast) {
+  try {
+    const pattern = /^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.md$/;
+    const all = fs.readdirSync(outDir).filter((f) => pattern.test(f)).sort();
+    for (const f of all.slice(0, Math.max(0, all.length - keepLast))) {
+      fs.unlinkSync(path.join(outDir, f));
+    }
+  } catch {
+    // non-fatal
+  }
+}
+
 function getTimestamp() {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  return [
-    now.getFullYear(),
-    pad(now.getMonth() + 1),
-    pad(now.getDate()),
-  ].join('-') + '-' + [
-    pad(now.getHours()),
-    pad(now.getMinutes()),
-    pad(now.getSeconds()),
-  ].join('-');
+  return [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate())].join('-')
+    + '-'
+    + [pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())].join('-');
 }
+
+function deactivate() { }
 
 module.exports = { activate, deactivate };

@@ -13,12 +13,11 @@ function getLocalDateTimeString() {
   const day = pad(now.getDate());
 
   const h24 = now.getHours();
-  const h12 = h24 % 12 || 12;  // 0 → 12 for midnight/noon
+  const h12 = h24 % 12 || 12;
   const ampm = h24 >= 12 ? 'PM' : 'AM';
   const min = pad(now.getMinutes());
   const sec = pad(now.getSeconds());
 
-  // getTimezoneOffset() is minutes WEST of UTC — negate for display
   const offsetTotalMin = -now.getTimezoneOffset();
   const offsetSign = offsetTotalMin >= 0 ? '+' : '-';
   const offsetHours = Math.floor(Math.abs(offsetTotalMin) / 60);
@@ -30,23 +29,22 @@ function getLocalDateTimeString() {
   return `${year} ${month} ${day} ${pad(h12)}:${min}:${sec} ${ampm} ${offsetStr}`;
 }
 
-// Returns "48.30 KB" or "1.24 MB"
 function formatBytes(bytes) {
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(2)} KB`;
-  }
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function renderMarkdown(rootPath, treeLines, files, totalSizeBytes) {
+function renderMarkdown(rootPath, treeLines, files, totalSizeBytes, skippedCount = 0) {
   const projectName = path.basename(rootPath);
-  const displayTime = getLocalDateTimeString();
   const parts = [];
 
   parts.push(`# Workspace Snapshot: \`${projectName}\``);
   parts.push('');
-  parts.push(`> **Generated:** ${displayTime}  `);
+  parts.push(`> **Generated:** ${getLocalDateTimeString()}  `);
   parts.push(`> **Files included:** ${files.length}  `);
+  if (skippedCount > 0) {
+    parts.push(`> **Files skipped:** ${skippedCount}  `);
+  }
   parts.push(`> **Repo size:** ${formatBytes(totalSizeBytes)}  `);
   parts.push('');
   parts.push('---');
@@ -74,13 +72,9 @@ function renderMarkdown(rootPath, treeLines, files, totalSizeBytes) {
 
     try {
       const content = fs.readFileSync(abs, 'utf8');
-      if (content.includes('\u0000')) {
-        parts.push('*Skipped: binary file detected.*');
-      } else {
-        parts.push(`\`\`\`${lang}`);
-        parts.push(content.trimEnd());
-        parts.push('```');
-      }
+      parts.push(`\`\`\`${lang}`);
+      parts.push(content.trimEnd());
+      parts.push('```');
     } catch (err) {
       parts.push(`*Skipped: could not read file (${err.code || err.message}).*`);
     }
