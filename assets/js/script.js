@@ -18,9 +18,7 @@ async function loadVersion() {
 function applyVersion(v) {
     const url = `https://github.com/${REPO}/releases/download/v${v}/tree-mapper-${v}.vsix`;
     document.querySelectorAll('[data-download-btn]').forEach(el => { el.href = url; });
-    document.querySelectorAll('[data-version]').forEach(el => {
-        el.textContent = `v${v}`;
-    });
+    document.querySelectorAll('[data-version]').forEach(el => { el.textContent = `v${v}`; });
 }
 
 function applyReleaseFallback() {
@@ -28,6 +26,12 @@ function applyReleaseFallback() {
 }
 
 loadVersion();
+
+/* ── Nav scroll effect ── */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 10);
+}, { passive: true });
 
 /* ── Nav hamburger ── */
 const burger = document.getElementById('burger');
@@ -68,7 +72,6 @@ const revealObs = new IntersectionObserver(entries => {
 }, { threshold: 0.1 });
 
 document.querySelectorAll('[data-reveal]').forEach(el => {
-    // Hero elements: trigger immediately
     if (el.closest('.hero')) {
         setTimeout(() => el.classList.add('visible'), 80);
     } else {
@@ -80,18 +83,19 @@ document.querySelectorAll('[data-reveal]').forEach(el => {
 const terminalLines = [
     { type: 'cmd', text: '# Right-clicked: my-project/src' },
     { type: 'out', text: '' },
-    { type: 'out', text: '⠸ Scanning workspace files…' },
-    { type: 'out', text: '⠸ Building tree for 14 files…' },
-    { type: 'out', text: '⠸ Rendering Markdown snapshot…' },
+    { type: 'out', text: '⠸ Scanning workspace…' },
+    { type: 'out', text: '⠸ Building file picker…' },
+    { type: 'out', text: '⠸ 14 files selected' },
+    { type: 'out', text: '⠸ Rendering Markdown…' },
     { type: 'out', text: '' },
     { type: 'tree', text: 'src/' },
     { type: 'tree', text: '├── <span class="file-js">extension.js</span>' },
     { type: 'tree', text: '├── <span class="file-js">scanner.js</span>' },
     { type: 'tree', text: '├── <span class="file-js">treeBuilder.js</span>' },
-    { type: 'tree', text: '├── <span class="file-js">markdownRenderer.js</span>' },
     { type: 'tree', text: '└── <span class="file-js">languageMap.js</span>' },
     { type: 'out', text: '' },
-    { type: 'success', text: '✓ Snapshot saved → .tree/2026-04-11-14-35-22.md' },
+    { type: 'success', text: '✓ Snapshot saved' },
+    { type: 'success', text: '→ .tree/2026-04-11-14-35-22.md' },
     { type: 'out', text: '' },
     { type: 'prompt', text: '' },
 ];
@@ -104,8 +108,8 @@ function typeLine() {
         setTimeout(() => {
             termBody.innerHTML = '';
             lineIdx = 0;
-            setTimeout(typeLine, 400);
-        }, 3200);
+            setTimeout(typeLine, 500);
+        }, 3000);
         return;
     }
 
@@ -127,7 +131,7 @@ function typeLine() {
 
     termBody.appendChild(div);
     termBody.scrollTop = termBody.scrollHeight;
-    setTimeout(typeLine, line.type === 'out' && line.text === '' ? 80 : 125);
+    setTimeout(typeLine, line.type === 'out' && line.text === '' ? 70 : 120);
 }
 
-setTimeout(typeLine, 900);
+setTimeout(typeLine, 800);

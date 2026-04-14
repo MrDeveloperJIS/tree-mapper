@@ -1,6 +1,5 @@
 # Tree Mapper Snapshots
 .tree/
-.treeignore
 
 # Dependencies
 node_modules/
