@@ -128,8 +128,11 @@
             <span>Right-click to run</span><span class="mx">✦</span>
             <span>Smart ignore rules</span><span class="mx">✦</span>
             <span>Auto .gitignore</span><span class="mx">✦</span>
-            <span>Binary detection</span><span class="mx">✦</span>
+            <span>Token count</span><span class="mx">✦</span>
+            <span>Selection memory</span><span class="mx">✦</span>
             <span>Snapshot history</span><span class="mx">✦</span>
+            <span>Status bar</span><span class="mx">✦</span>
+            <span>Dual tree view</span><span class="mx">✦</span>
             <!-- duplicate for seamless loop -->
             <span>Directory Tree</span><span class="mx">✦</span>
             <span>Source Code</span><span class="mx">✦</span>
@@ -138,8 +141,11 @@
             <span>Right-click to run</span><span class="mx">✦</span>
             <span>Smart ignore rules</span><span class="mx">✦</span>
             <span>Auto .gitignore</span><span class="mx">✦</span>
-            <span>Binary detection</span><span class="mx">✦</span>
+            <span>Token count</span><span class="mx">✦</span>
+            <span>Selection memory</span><span class="mx">✦</span>
             <span>Snapshot history</span><span class="mx">✦</span>
+            <span>Status bar</span><span class="mx">✦</span>
+            <span>Dual tree view</span><span class="mx">✦</span>
         </div>
     </div>
 
@@ -152,6 +158,8 @@
             </div>
 
             <div class="feat-grid">
+
+                <!-- ROW 1: wide(2) + 1 col = 3 -->
                 <div class="feat feat-wide" data-reveal data-delay="1">
                     <div class="feat-icon-wrap">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -175,6 +183,7 @@
                     <p>60+ file types detected. Every file wrapped in a properly fenced, syntax-tagged code block.</p>
                 </div>
 
+                <!-- ROW 2: 1 + 1 + 1 = 3 -->
                 <div class="feat" data-reveal data-delay="3">
                     <div class="feat-icon-wrap">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -209,6 +218,7 @@
                     <p>Detects <code>.git</code> and automatically adds <code>.tree/</code> to <code>.gitignore</code> — zero duplicates, zero config.</p>
                 </div>
 
+                <!-- ROW 3: 1 + wide(2) = 3 -->
                 <div class="feat" data-reveal data-delay="6">
                     <div class="feat-icon-wrap">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -229,10 +239,74 @@
                         </svg>
                     </div>
                     <div>
-                        <h3>Interactive file picker <span class="tag-new">v2.0</span></h3>
-                        <p>Choose exactly which files to include — a full interactive picker opens inside VS Code, with checkboxes for every file. You decide what goes into the snapshot.</p>
+                        <h3>Interactive file picker <span class="tag-new">v2.0+</span></h3>
+                        <p>Choose exactly which files to include — a full interactive picker opens inside VS Code, with checkboxes for every file, live search/filter, and folder auto-collapse for excluded directories. You decide what goes into the snapshot.</p>
                     </div>
                 </div>
+
+                <!-- ROW 4: wide(2) + 1 = 3 -->
+                <div class="feat feat-wide feat-accent" data-reveal data-delay="8">
+                    <div class="feat-icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3>Status bar integration <span class="tag-new">v2.0</span></h3>
+                        <p>A persistent "Tree Mapper" entry in VS Code's status bar shows live scan state — scanning, ignored count, generating — and acts as a one-click shortcut to run the command at any time.</p>
+                    </div>
+                </div>
+
+                <div class="feat" data-reveal data-delay="9">
+                    <div class="feat-icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                            <path d="M2 17l10 5 10-5" />
+                            <path d="M2 12l10 5 10-5" />
+                        </svg>
+                    </div>
+                    <h3>Token count in header <span class="tag-new">v2.0</span></h3>
+                    <p>Every snapshot includes an <code>Est. token count</code> — know exactly how much LLM context your snapshot will consume before pasting it into any AI.</p>
+                </div>
+
+                <!-- ROW 5: 1 + 1 + 1 = 3 -->
+                <div class="feat" data-reveal data-delay="10">
+                    <div class="feat-icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="1 4 1 10 7 10" />
+                            <path d="M3.51 15a9 9 0 1 0 .49-4.51" />
+                        </svg>
+                    </div>
+                    <h3>Selection memory <span class="tag-new">v2.1</span></h3>
+                    <p>The picker remembers your last file selection per workspace. Hit <em>Restore last</em> to instantly reload your previous choices — no re-checking files on every run.</p>
+                </div>
+
+                <div class="feat" data-reveal data-delay="11">
+                    <div class="feat-icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="10" rx="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                    </div>
+                    <h3>Snapshot rotation <span class="tag-new">v1.2</span></h3>
+                    <p>Keeps only the <code>N</code> most recent snapshots in <code>.tree/</code> — oldest deleted automatically. Configurable via <code>keepLastSnapshots</code>. Default: 10.</p>
+                </div>
+
+                <div class="feat" data-reveal data-delay="12">
+                    <div class="feat-icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                    </div>
+                    <h3>Dual tree sections</h3>
+                    <p>Every snapshot has a <strong>Workspace Tree</strong> (full repo) and a <strong>Snapshot Tree</strong> (only selected files) — two clear reference points in one file.</p>
+                </div>
+
             </div>
         </div>
     </section>
@@ -307,14 +381,14 @@
                         <div class="oi-num">—</div>
                         <div>
                             <h4>Metadata header</h4>
-                            <p>Timestamp, file count, skipped files, and total repo size — every snapshot is fully self-documenting.</p>
+                            <p>Timestamp, file count, skipped files, excluded files, total repo size, and estimated token count — every snapshot is fully self-documenting.</p>
                         </div>
                     </div>
                     <div class="output-item" data-reveal data-delay="2">
                         <div class="oi-num">—</div>
                         <div>
-                            <h4>Project tree</h4>
-                            <p>Full directory hierarchy in a code block — paste it anywhere and it just works.</p>
+                            <h4>Dual project trees</h4>
+                            <p>Two tree sections: <strong>Workspace Tree</strong> (the full repo minus ignored paths) and <strong>Snapshot Tree</strong> (only the files you selected) — paste either anywhere.</p>
                         </div>
                     </div>
                     <div class="output-item" data-reveal data-delay="3">
@@ -340,10 +414,12 @@
                     </div>
                     <pre class="preview-code"><span class="pc-h1"># Workspace Snapshot: `my-project`</span>
 
-<span class="pc-meta">&gt; **Generated:** 2026 04 14 11:16 PM UTC+6
+<span class="pc-meta">&gt; **Generated:** 2026 04 29 12:15 AM UTC+6
 &gt; **Files included:** 12
 &gt; **Files skipped:** 1
-&gt; **Repo size:** 48.30 KB</span>
+&gt; **Files excluded:** 268
+&gt; **Repo size:** 48.30 KB
+&gt; **Est. token count:** ~12,400 tokens</span>
 
 ---
 
@@ -356,6 +432,15 @@ my-project/
 <span class="pc-sym">│   └── </span><span class="pc-js">scanner.js</span>
 <span class="pc-sym">├── </span><span class="pc-md">README.md</span>
 <span class="pc-sym">└── </span><span class="pc-js">package.json</span>
+<span class="pc-fence">```</span>
+
+<span class="pc-h2">## Snapshot Tree</span>
+
+<span class="pc-fence">```</span>
+my-project/
+<span class="pc-sym">└── </span><span class="pc-dir">src/</span>
+<span class="pc-sym">    ├── </span><span class="pc-js">extension.js</span>
+<span class="pc-sym">    └── </span><span class="pc-js">scanner.js</span>
 <span class="pc-fence">```</span>
 
 <span class="pc-h2">## File Contents</span>
