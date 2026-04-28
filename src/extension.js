@@ -58,6 +58,9 @@ function activate(context) {
       `Tree Mapper: ${allEntries.total} files found, ${allEntries.ignored} ignored by default`
     );
 
+    // ── Load last selection for this root ────────────────────────────────────
+    const lastSelection = loadLastSelection(rootPath);
+
     // ── Step 2: Show interactive file picker ─────────────────────────────────
     const panel = vscode.window.createWebviewPanel(
       'treemapperPicker',
@@ -66,7 +69,7 @@ function activate(context) {
       { enableScripts: true, retainContextWhenHidden: true }
     );
 
-    panel.webview.html = buildPickerHtml(allEntries.tree, path.basename(rootPath));
+    panel.webview.html = buildPickerHtml(allEntries.tree, path.basename(rootPath), lastSelection);
 
     // Wait for user to confirm or cancel
     const selected = await new Promise((resolve) => {
@@ -110,7 +113,7 @@ function activate(context) {
         let totalSizeBytes = 0;
         let skippedCount = 0;
         /** @type {{ rel: string, reason: string }[]} */
-        const skippedFiles = [];   // ← NEW: collect skipped file details
+        const skippedFiles = [];
         const validFiles = [];
 
         for (const rel of selectedPaths) {
@@ -123,7 +126,6 @@ function activate(context) {
 
           if (entry.skipped) {
             skippedCount++;
-            // ── NEW: record reason ──────────────────────────────────────────
             skippedFiles.push({
               rel,
               reason: entry.isBinary
@@ -165,7 +167,7 @@ function activate(context) {
           totalSizeBytes,
           skippedCount,
           excludedSet.size,
-          skippedFiles,        // ← NEW
+          skippedFiles,
         );
 
         const outDir = path.join(rootPath, '.tree');
@@ -174,6 +176,9 @@ function activate(context) {
         }
 
         syncGitignore(rootPath);
+
+        // ── Save last selection ──────────────────────────────────────────────
+        saveLastSelection(rootPath, selected);
 
         const timestamp = getTimestamp();
         outFile = path.join(outDir, `${timestamp}.md`);
@@ -197,8 +202,6 @@ function activate(context) {
     // ── Auto-dismissing "Open File" notification (3 s) ──────────────────────
     const timestamp = path.basename(outFile, '.md');
 
-    // Race: either the user clicks "Open File" or 3 s elapse — whichever
-    // comes first wins. withProgress auto-closes when the promise resolves.
     const choice = await new Promise((resolve) => {
       const timer = setTimeout(() => resolve(null), 3000);
 
@@ -272,10 +275,42 @@ function getTimestamp() {
     + [pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())].join('-');
 }
 
+// ── Last-selection memory ─────────────────────────────────────────────────────
+
+function getSelectionFilePath(rootPath) {
+  return path.join(rootPath, '.tree', 'last-selection.json');
+}
+
+function loadLastSelection(rootPath) {
+  try {
+    const filePath = getSelectionFilePath(rootPath);
+    if (!fs.existsSync(filePath)) return null;
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) return data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastSelection(rootPath, selected) {
+  try {
+    const outDir = path.join(rootPath, '.tree');
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
+    fs.writeFileSync(getSelectionFilePath(rootPath), JSON.stringify(selected), 'utf8');
+  } catch {
+    // non-fatal
+  }
+}
+
 // ── Webview HTML ──────────────────────────────────────────────────────────────
 
-function buildPickerHtml(treeNodes, projectName) {
+function buildPickerHtml(treeNodes, projectName, lastSelection) {
   const treeJson = JSON.stringify(treeNodes);
+  const lastSelectionJson = JSON.stringify(lastSelection || null);
   return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -376,6 +411,7 @@ function buildPickerHtml(treeNodes, projectName) {
     padding: 8px 20px;
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
   }
   .btn-ghost {
     background: transparent;
@@ -395,6 +431,24 @@ function buildPickerHtml(treeNodes, projectName) {
     color: var(--fg);
     border-color: var(--border);
     background: var(--bg-input);
+  }
+  .btn-ghost.memory {
+    color: var(--accent);
+    border-color: rgba(59,130,246,0.3);
+    background: var(--accent-glow);
+  }
+  .btn-ghost.memory:hover {
+    border-color: rgba(59,130,246,0.55);
+    background: rgba(59,130,246,0.22);
+  }
+  .btn-ghost.select-filtered {
+    color: var(--success);
+    border-color: rgba(52,211,153,0.3);
+    background: rgba(52,211,153,0.07);
+  }
+  .btn-ghost.select-filtered:hover {
+    border-color: rgba(52,211,153,0.55);
+    background: rgba(52,211,153,0.15);
   }
   .divider-v {
     width: 1px;
@@ -655,6 +709,7 @@ function buildPickerHtml(treeNodes, projectName) {
   <button class="btn-ghost" onclick="selectAll()">Select all</button>
   <button class="btn-ghost" onclick="selectNone()">Deselect all</button>
   <button class="btn-ghost" onclick="resetDefaults()">Reset defaults</button>
+  <button class="btn-ghost memory" id="restoreLastBtn" style="display:none" onclick="restoreLastSelection()">↺ Restore last</button>
   <div class="divider-v"></div>
   <div class="search-wrap">
     <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="1.5">
@@ -663,6 +718,7 @@ function buildPickerHtml(treeNodes, projectName) {
     </svg>
     <input class="search-input" id="searchInput" type="text" placeholder="Filter files…" oninput="filterTree(this.value)">
   </div>
+  <button class="btn-ghost select-filtered" id="selectFilteredBtn" style="display:none" onclick="selectFiltered()">Select filtered</button>
   <div class="stats-pill" id="statsLabel"><span class="count">—</span> / <span class="count">—</span></div>
 </div>
 
@@ -685,6 +741,7 @@ function buildPickerHtml(treeNodes, projectName) {
 <script>
 const vscode = acquireVsCodeApi();
 const TREE = ${treeJson};
+const LAST_SELECTION = ${lastSelectionJson};
 
 let nodeMap = {};      // rel → node
 let allFileNodes = []; // flat list of file nodes
@@ -697,6 +754,30 @@ function buildUI() {
   allFileNodes = [];
   renderLevel(TREE, container, 0, []);
   updateStats();
+
+  // Show "Restore last" button only if a last selection exists
+  if (LAST_SELECTION && LAST_SELECTION.length > 0) {
+    document.getElementById('restoreLastBtn').style.display = '';
+  }
+}
+
+/**
+ * Returns true if ALL file descendants of a node are ignoredByDefault.
+ * Used to decide whether to collapse a dir by default.
+ */
+function allDescendantsExcluded(node) {
+  if (!node.isDir || !node.children || node.children.length === 0) return false;
+  function check(children) {
+    for (const c of children) {
+      if (!c.isDir) {
+        if (!c.ignoredByDefault) return false;
+      } else {
+        if (!check(c.children || [])) return false;
+      }
+    }
+    return true;
+  }
+  return check(node.children);
 }
 
 /**
@@ -731,7 +812,13 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
     tog.innerHTML = node.isDir && node.children && node.children.length
       ? '<svg viewBox="0 0 10 10" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,3 5,7 8,3"/></svg>'
       : '';
+
+    // Determine if this dir should start collapsed (all children excluded)
+    const startCollapsed = node.isDir && node.children && node.children.length > 0
+      && allDescendantsExcluded(node);
+
     if (node.isDir && node.children && node.children.length) {
+      if (startCollapsed) tog.classList.add('collapsed');
       tog.addEventListener('click', (e) => {
         e.stopPropagation();
         const childWrap = document.querySelector('[data-parent-rel="' + CSS.escape(node.rel) + '"]');
@@ -788,6 +875,8 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
     if (node.isDir && node.children && node.children.length) {
       const childWrap = document.createElement('div');
       childWrap.dataset.parentRel = node.rel;
+      // Collapse by default if all descendants are excluded
+      if (startCollapsed) childWrap.style.display = 'none';
       renderLevel(node.children, childWrap, depth + 1, [...ancestorIsLast, isLast]);
       container.appendChild(childWrap);
     }
@@ -853,14 +942,27 @@ function selectNone() {
   updateStats();
 }
 function resetDefaults() {
-  // Reset file checkboxes
   document.querySelectorAll('input.node-cb').forEach(cb => {
     const node = nodeMap[cb.dataset.rel];
     if (!node || node.isDir) return;
     cb.checked = !node.ignoredByDefault;
     cb.indeterminate = false;
   });
-  // Recompute dir states
+  allFileNodes.forEach(n => updateAncestors(n.rel));
+  updateStats();
+}
+
+// ── Memory: restore last selection ──────────────────────────────────────────
+function restoreLastSelection() {
+  if (!LAST_SELECTION || !LAST_SELECTION.length) return;
+  const lastSet = new Set(LAST_SELECTION);
+  // First uncheck all files
+  document.querySelectorAll('input.node-cb').forEach(cb => {
+    const node = nodeMap[cb.dataset.rel];
+    if (!node || node.isDir) return;
+    cb.checked = lastSet.has(cb.dataset.rel);
+    cb.indeterminate = false;
+  });
   allFileNodes.forEach(n => updateAncestors(n.rel));
   updateStats();
 }
@@ -868,15 +970,55 @@ function resetDefaults() {
 // ── Filter ──────────────────────────────────────────────────────────────────
 function filterTree(q) {
   q = q.toLowerCase().trim();
+  const filterBtn = document.getElementById('selectFilteredBtn');
+
   if (!q) {
     document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('hidden'));
-    document.querySelectorAll('[data-parent-rel]').forEach(w => w.style.display = '');
+    document.querySelectorAll('[data-parent-rel]').forEach(w => {
+      // Restore collapse state: re-hide if all-excluded dir
+      const parentRel = w.dataset.parentRel;
+      const node = nodeMap[parentRel];
+      if (node && allDescendantsExcluded(node)) {
+        // Only restore collapsed if not manually expanded by user
+        // We check the toggle zone state
+        const tog = document.querySelector('.tree-row[data-rel="' + CSS.escape(parentRel) + '"] .toggle-zone');
+        if (tog && tog.classList.contains('collapsed')) {
+          w.style.display = 'none';
+        } else {
+          w.style.display = '';
+        }
+      } else {
+        w.style.display = '';
+      }
+    });
+    filterBtn.style.display = 'none';
     return;
   }
+
+  // When filtering: expand all wrappers so we can search across them
+  document.querySelectorAll('[data-parent-rel]').forEach(w => w.style.display = '');
+
   document.querySelectorAll('.tree-row').forEach(row => {
     const rel = row.dataset.rel || '';
     row.classList.toggle('hidden', !rel.toLowerCase().includes(q));
   });
+
+  // Show "Select filtered" button whenever there's an active query
+  filterBtn.style.display = '';
+}
+
+// ── Select filtered files ────────────────────────────────────────────────────
+function selectFiltered() {
+  // Check all visible (non-hidden) file rows
+  document.querySelectorAll('.tree-row:not(.hidden)').forEach(row => {
+    if (row.dataset.isDir === '1') return;
+    const rel = row.dataset.rel;
+    const cb = getCb(rel);
+    if (cb) { cb.checked = true; cb.indeterminate = false; }
+  });
+  // Recompute all ancestor states
+  allFileNodes.forEach(n => updateAncestors(n.rel));
+  updateStats();
 }
 
 // ── Stats ───────────────────────────────────────────────────────────────────
