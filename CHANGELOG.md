@@ -4,6 +4,21 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.2.0 — 2026-04-29
+
+### Changed
+
+- **Picker UI redesigned again** — The file picker has a new deep-navy visual theme (`#080810` base) with a violet-to-cyan gradient accent, ambient radial mesh background, Inter/JetBrains Mono fonts, pill-shaped buttons and chips, and a gradient scrollbar thumb. Glassmorphism backdrop-blur is applied to the header, toolbar, and footer.
+- **Snapshot generation refactored out of `withProgress`** — The file selection, tree building, and Markdown rendering steps now run outside the progress callback. The first `withProgress` call is now a short fixed-delay placeholder (~1 s), eliminating the prior nested async structure.
+- **Excluded chip label changed** — The `excl` label in excluded-file rows is now `x`.
+
+### Removed
+
+- **File-type colour icons** — Per-extension colour-coded file icons have been removed from the picker tree rows.
+- **Legend bar** — The included/excluded colour legend row between the toolbar and the file tree has been removed.
+
+---
+
 ## v2.1.0 — 2026-04-28
 
 ### Added

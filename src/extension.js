@@ -96,104 +96,93 @@ function activate(context) {
     let outFile = null;
 
     await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: 'Tree Mapper',
-        cancellable: false,
-      },
+      { location: vscode.ProgressLocation.Notification, title: 'Tree Mapper', cancellable: false },
       async (progress) => {
         progress.report({ message: `Building tree for ${selected.length} files…` });
-
-        // Include any entry the user checked, regardless of ignoredByDefault flag.
-        const selectedPaths = selected.filter((rel) => {
-          const entry = allEntries.entries.find((e) => e.rel === rel && !e.isDir);
-          return !!entry;
-        });
-
-        let totalSizeBytes = 0;
-        let skippedCount = 0;
-        /** @type {{ rel: string, reason: string }[]} */
-        const skippedFiles = [];
-        const validFiles = [];
-
-        for (const rel of selectedPaths) {
-          const entry = allEntries.entries.find((e) => e.rel === rel);
-          if (!entry) continue;
-
-          if (entry.skipped && !entry.isBinary && entry.size <= (maxFileSizeKB * 1024)) {
-            entry.skipped = false;
-          }
-
-          if (entry.skipped) {
-            skippedCount++;
-            skippedFiles.push({
-              rel,
-              reason: entry.isBinary
-                ? 'binary file'
-                : `exceeds size limit (${(entry.size / 1024).toFixed(1)} KB)`,
-            });
-            continue;
-          }
-
-          totalSizeBytes += entry.size;
-          validFiles.push(rel);
-        }
-
-        // Compute excluded files (user-unchecked)
-        const allFilePaths = allEntries.entries
-          .filter((e) => !e.isDir)
-          .map((e) => e.rel);
-
-        const validSet = new Set(validFiles);
-        const excludedSet = new Set(
-          allFilePaths.filter((r) => !validSet.has(r))
-        );
-
-        // Build both trees
-        const { workspaceTreeLines, snapshotTreeLines } = buildTree(
-          validFiles,
-          excludedSet,
-          defaultIgnorePatterns,
-          allEntries.entries,
-        );
-
-        progress.report({ message: 'Rendering Markdown snapshot…' });
-
-        const markdown = renderMarkdown(
-          rootPath,
-          workspaceTreeLines,
-          snapshotTreeLines,
-          validFiles,
-          totalSizeBytes,
-          skippedCount,
-          excludedSet.size,
-          skippedFiles,
-        );
-
-        const outDir = path.join(rootPath, '.tree');
-        if (!fs.existsSync(outDir)) {
-          fs.mkdirSync(outDir, { recursive: true });
-        }
-
-        syncGitignore(rootPath);
-
-        // ── Save last selection ──────────────────────────────────────────────
-        saveLastSelection(rootPath, selected);
-
-        const timestamp = getTimestamp();
-        outFile = path.join(outDir, `${timestamp}.md`);
-
-        try {
-          fs.writeFileSync(outFile, markdown, 'utf8');
-        } catch (err) {
-          vscode.window.showErrorMessage(`Tree Mapper write error: ${err.message}`);
-          outFile = null;
-          return;
-        }
-
-        pruneSnapshots(outDir, keepLastSnapshots);
+        await new Promise((r) => setTimeout(r, 1000));
       }
     );
+
+    const selectedPaths = selected.filter((rel) => {
+      const entry = allEntries.entries.find((e) => e.rel === rel && !e.isDir);
+      return !!entry;
+    });
+
+    let totalSizeBytes = 0;
+    let skippedCount = 0;
+    /** @type {{ rel: string, reason: string }[]} */
+    const skippedFiles = [];
+    const validFiles = [];
+
+    for (const rel of selectedPaths) {
+      const entry = allEntries.entries.find((e) => e.rel === rel);
+      if (!entry) continue;
+
+      if (entry.skipped && !entry.isBinary && entry.size <= (maxFileSizeKB * 1024)) {
+        entry.skipped = false;
+      }
+
+      if (entry.skipped) {
+        skippedCount++;
+        skippedFiles.push({
+          rel,
+          reason: entry.isBinary
+            ? 'binary file'
+            : `exceeds size limit (${(entry.size / 1024).toFixed(1)} KB)`,
+        });
+        continue;
+      }
+
+      totalSizeBytes += entry.size;
+      validFiles.push(rel);
+    }
+
+    const allFilePaths = allEntries.entries
+      .filter((e) => !e.isDir)
+      .map((e) => e.rel);
+
+    const validSet = new Set(validFiles);
+    const excludedSet = new Set(
+      allFilePaths.filter((r) => !validSet.has(r))
+    );
+
+    const { workspaceTreeLines, snapshotTreeLines } = buildTree(
+      validFiles,
+      excludedSet,
+      defaultIgnorePatterns,
+      allEntries.entries,
+    );
+
+    const markdown = renderMarkdown(
+      rootPath,
+      workspaceTreeLines,
+      snapshotTreeLines,
+      validFiles,
+      totalSizeBytes,
+      skippedCount,
+      excludedSet.size,
+      skippedFiles,
+    );
+
+    const outDir = path.join(rootPath, '.tree');
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
+
+    syncGitignore(rootPath);
+    saveLastSelection(rootPath, selected);
+
+    const snapshotTimestamp = getTimestamp();
+    outFile = path.join(outDir, `${snapshotTimestamp}.md`);
+
+    try {
+      fs.writeFileSync(outFile, markdown, 'utf8');
+    } catch (err) {
+      vscode.window.showErrorMessage(`Tree Mapper write error: ${err.message}`);
+      outFile = null;
+    }
+
+    pruneSnapshots(outDir, keepLastSnapshots);
 
     resetStatusBar();
 
@@ -207,12 +196,11 @@ function activate(context) {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Tree Mapper: Snapshot saved → .tree/${timestamp}.md`,
         cancellable: false,
       },
-      (_progress) =>
+      (_progress, token) =>
         new Promise((resolve) => {
-          const timer = setTimeout(resolve, 3000);
+          const timer = setTimeout(resolve, 1000);
 
           vscode.window
             .showInformationMessage(
@@ -331,32 +319,44 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
   :root {
-    --bg:           var(--vscode-editor-background,      #0d0d0f);
-    --bg-panel:     var(--vscode-sideBar-background,     #111114);
-    --bg-input:     var(--vscode-input-background,       #18181c);
-    --bg-hover:     var(--vscode-list-hoverBackground,   #16161a);
-    --bg-glass:     #ffffff08;
-    --border:       var(--vscode-panel-border,           #222228);
-    --border-soft:  #ffffff0f;
-    --fg:           var(--vscode-editor-foreground,      #e8e8f0);
-    --fg-dim:       var(--vscode-descriptionForeground,  #5a5a72);
-    --fg-muted:     #333340;
-    --accent:       var(--vscode-button-background,      #5b7cf6);
-    --accent-fg:    var(--vscode-button-foreground,      #fff);
-    --accent-dim:   #5b7cf61f;
-    --accent-glow:  #5b7cf633;
-    --accent-line:  #5b7cf659;
-    --success:      #3dd68c;
-    --success-dim:  #3dd68c1a;
-    --danger:       #f16b6b;
-    --danger-dim:   #f16b6b14;
-    --danger-line:  #f16b6b33;
-    --amber:        #f59e0b;
-    --mono:         'Geist Mono', 'JetBrains Mono', 'Consolas', monospace;
-    --sans:         'Geist', var(--vscode-font-family, system-ui, sans-serif);
-    --radius:       6px;
-    --radius-lg:    10px;
+    --bg:           #080810;
+    --bg-panel:     #0c0c18;
+    --bg-input:     #111120;
+    --bg-hover:     #13132a;
+    --bg-glass:     rgba(255,255,255,0.04);
+    --border:       rgba(255,255,255,0.07);
+    --border-soft:  rgba(255,255,255,0.05);
+
+    --fg:           #eeeef8;
+    --fg-dim:       #6464a0;
+    --fg-muted:     #2e2e50;
+
+    /* Vivid violet-to-cyan gradient accent */
+    --accent:       #7c5cfc;
+    --accent-end:   #22d3ee;
+    --accent-fg:    #fff;
+    --accent-dim:   rgba(124,92,252,0.12);
+    --accent-glow:  rgba(124,92,252,0.35);
+    --accent-line:  rgba(124,92,252,0.4);
+
+    --success:      #00e5a0;
+    --success-dim:  rgba(0,229,160,0.1);
+    --success-glow: rgba(0,229,160,0.3);
+
+    --danger:       #ff5f87;
+    --danger-dim:   rgba(255,95,135,0.1);
+    --danger-line:  rgba(255,95,135,0.3);
+
+    --amber:        #fbbf24;
+
+    --mono:         'JetBrains Mono', 'Geist Mono', monospace;
+    --sans:         'Inter', var(--vscode-font-family, system-ui, sans-serif);
+    --radius:       8px;
+    --radius-lg:    12px;
+    --radius-pill:  99px;
     --ease:         cubic-bezier(0.16, 1, 0.3, 1);
     --t:            0.18s;
   }
@@ -370,29 +370,31 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     font-size: 13px;
     height: 100vh;
     display: grid;
-    grid-template-rows: auto auto auto 1fr auto;
+    grid-template-rows: auto auto 1fr auto;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ─── Animated background grain ─────────────────────────────────────── */
+  /* ─── Ambient mesh background ────────────────────────────────────────── */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 0%, rgba(124,92,252,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 30% at 80% 100%, rgba(34,211,238,0.07) 0%, transparent 70%);
     pointer-events: none;
     z-index: 0;
-    opacity: 0.4;
   }
 
   /* ─── Header ─────────────────────────────────────────────────────────── */
   .header {
     position: relative;
     z-index: 1;
-    background: var(--bg-panel);
+    background: rgba(12,12,24,0.85);
+    backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
-    padding: 14px 20px 13px;
+    padding: 13px 20px 12px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -406,29 +408,27 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent-line) 30%, var(--accent-line) 70%, transparent);
-    opacity: 0.5;
+    background: linear-gradient(90deg, transparent, rgba(124,92,252,0.6) 40%, rgba(34,211,238,0.4) 60%, transparent);
   }
 
   .header-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent-dim), rgba(91,124,246,0.06));
-    border: 1px solid var(--accent-line);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    box-shadow: 0 0 12px var(--accent-glow);
-  }
-  .header-icon svg { width: 14px; height: 14px; fill: var(--accent); }
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 0 18px rgba(82,232,154,0.3), 0 2px 8px rgba(0,0,0,0.4);
+}
+  .header-icon svg { width: 32px; height: 32px; }
 
   .header-title {
     font-size: 13px;
     font-weight: 600;
     color: var(--fg);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
     line-height: 1;
     margin-bottom: 4px;
   }
@@ -438,22 +438,19 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     font-family: var(--mono);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
   }
   .project-chip {
-    background: var(--accent-dim);
-    border: 1px solid var(--accent-line);
-    border-radius: 4px;
-    padding: 1px 7px;
+    background: linear-gradient(90deg, rgba(124,92,252,0.18), rgba(34,211,238,0.12));
+    border: 1px solid rgba(124,92,252,0.45);
+    border-radius: var(--radius-pill);
+    padding: 1px 9px;
     font-size: 10.5px;
-    color: var(--accent);
+    color: #a78bfa;
     letter-spacing: 0.01em;
     font-weight: 500;
   }
-  .header-hint {
-    color: var(--fg-dim);
-    font-size: 10.5px;
-  }
+  .header-hint { color: var(--fg-dim); font-size: 10.5px; }
 
   /* ─── Toolbar ────────────────────────────────────────────────────────── */
   .toolbar {
@@ -461,62 +458,44 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: var(--bg-panel);
+    gap: 5px;
+    padding: 7px 14px;
+    background: rgba(11,11,22,0.7);
+    backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
     animation: slideDown 0.4s 0.05s var(--ease) both;
   }
 
   .btn-ghost {
-    background: transparent;
+    background: var(--bg-glass);
     color: var(--fg-dim);
-    border: 1px solid transparent;
-    border-radius: var(--radius);
-    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    padding: 4px 12px;
     font-size: 11px;
     font-family: var(--sans);
     font-weight: 500;
     cursor: pointer;
     letter-spacing: 0.01em;
-    transition: color var(--t), border-color var(--t), background var(--t), box-shadow var(--t);
+    transition: color var(--t), border-color var(--t), background var(--t), box-shadow var(--t), transform var(--t);
     white-space: nowrap;
-    line-height: 1.6;
+    line-height: 1.7;
   }
   .btn-ghost:hover {
     color: var(--fg);
-    border-color: var(--border-soft);
-    background: var(--bg-glass);
+    border-color: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    transform: translateY(-1px);
   }
-  .btn-ghost:active { transform: scale(0.97); }
-
-  .btn-ghost.memory {
-    color: var(--accent);
-    border-color: var(--accent-line);
-    background: var(--accent-dim);
-  }
-  .btn-ghost.memory:hover {
-    background: rgba(91,124,246,0.2);
-    box-shadow: 0 0 8px var(--accent-glow);
-  }
-
-  .btn-ghost.select-filtered {
-    color: var(--success);
-    border-color: #3dd68c40;
-    background: var(--success-dim);
-  }
-  .btn-ghost.select-filtered:hover {
-    background: #3dd68c2e;
-    box-shadow: 0 0 8px #3dd68c26;
-  }
+  .btn-ghost:active { transform: scale(0.96) translateY(0); }
 
   .sep {
     width: 1px;
     height: 14px;
     background: var(--border);
     flex-shrink: 0;
-    margin: 0 2px;
+    margin: 0 3px;
   }
 
   .search-wrap {
@@ -526,7 +505,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   }
   .search-icon {
     position: absolute;
-    left: 9px;
+    left: 10px;
     top: 50%;
     transform: translateY(-50%);
     width: 12px;
@@ -541,19 +520,19 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     width: 100%;
     background: var(--bg-input);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-pill);
     color: var(--fg);
     font-family: var(--mono);
     font-size: 11.5px;
-    padding: 5px 10px 5px 28px;
+    padding: 5px 12px 5px 30px;
     outline: none;
     transition: border-color var(--t), box-shadow var(--t);
     letter-spacing: -0.01em;
   }
   .search-input::placeholder { color: var(--fg-muted); }
   .search-input:focus {
-    border-color: var(--accent-line);
-    box-shadow: 0 0 0 3px var(--accent-dim);
+    border-color: rgba(124,92,252,0.5);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.12);
   }
 
   .stats-pill {
@@ -564,51 +543,17 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     white-space: nowrap;
     background: var(--bg-input);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    padding: 3px 12px;
     letter-spacing: 0.01em;
-    transition: border-color var(--t);
+    transition: border-color var(--t), box-shadow var(--t);
   }
   .stats-pill .count { color: var(--fg); font-weight: 500; }
-  .stats-pill.has-selection { border-color: var(--accent-line); }
-  .stats-pill .count.selected { color: var(--accent); }
-
-  /* ─── Legend ─────────────────────────────────────────────────────────── */
-  .legend {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    gap: 0;
-    padding: 0 16px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-    animation: slideDown 0.4s 0.08s var(--ease) both;
+  .stats-pill.has-selection {
+    border-color: rgba(124,92,252,0.45);
+    box-shadow: 0 0 10px rgba(124,92,252,0.15);
   }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10px;
-    color: var(--fg-dim);
-    letter-spacing: 0.03em;
-    padding: 5px 14px 5px 0;
-    font-family: var(--mono);
-    text-transform: uppercase;
-  }
-  .legend-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .legend-dot.included {
-    background: var(--success);
-    box-shadow: 0 0 5px rgba(61,214,140,0.5);
-  }
-  .legend-dot.excluded {
-    background: var(--danger);
-    box-shadow: 0 0 5px rgba(241,107,107,0.4);
-  }
+  .stats-pill .count.selected { color: #a78bfa; }
 
   /* ─── Tree ───────────────────────────────────────────────────────────── */
   .tree-scroll {
@@ -623,11 +568,12 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     display: flex;
     align-items: center;
     padding: 0 16px 0 0;
-    height: 26px;
+    height: 27px;
     cursor: default;
     user-select: none;
     transition: background var(--t);
     position: relative;
+    border-radius: 0;
   }
   .tree-row:hover { background: var(--bg-hover); }
   .tree-row:hover::before {
@@ -637,8 +583,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     top: 0;
     bottom: 0;
     width: 2px;
-    background: var(--accent);
-    opacity: 0.5;
+    background: linear-gradient(180deg, #7c5cfc, #22d3ee);
     border-radius: 0 2px 2px 0;
   }
   .tree-row.hidden { display: none; }
@@ -648,7 +593,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     display: inline-flex;
     align-items: center;
     width: 20px;
-    height: 26px;
+    height: 27px;
     flex-shrink: 0;
     position: relative;
   }
@@ -659,8 +604,8 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     top: 0;
     bottom: 0;
     width: 1px;
-    background: var(--border);
-    opacity: 0.6;
+    background: linear-gradient(180deg, rgba(124,92,252,0.25), rgba(34,211,238,0.1));
+    opacity: 0.7;
   }
 
   .toggle-zone {
@@ -671,13 +616,13 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 5px;
     color: var(--fg-muted);
     transition: color var(--t), background var(--t);
   }
-  .toggle-zone:hover { color: var(--fg); background: var(--bg-input); }
+  .toggle-zone:hover { color: #a78bfa; background: rgba(124,92,252,0.12); }
   .toggle-zone.leaf { cursor: default; }
-  .toggle-zone.leaf:hover { background: transparent; }
+  .toggle-zone.leaf:hover { background: transparent; color: var(--fg-muted); }
   .toggle-zone svg {
     width: 10px;
     height: 10px;
@@ -697,18 +642,6 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     border-radius: 3px;
   }
 
-  .file-icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    margin-right: 5px;
-    opacity: 0.5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .file-icon svg { width: 12px; height: 12px; }
-
   .node-label {
     font-family: var(--mono);
     font-size: 12px;
@@ -721,21 +654,21 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     line-height: 1;
   }
   .node-label.dir-label {
-    color: var(--vscode-symbolIcon-folderForeground, #c9a96a);
+    color: #e2b96a;
     font-weight: 500;
   }
-  .node-label.dim { opacity: 0.3; }
+  .node-label.dim { opacity: 0.28; }
 
   .excl-chip {
     font-size: 9px;
     font-family: var(--sans);
     font-weight: 600;
-    letter-spacing: 0.06em;
-    background: var(--danger-dim);
+    letter-spacing: 0.07em;
+    background: rgba(255,95,135,0.1);
     color: var(--danger);
-    border: 1px solid var(--danger-line);
-    border-radius: 3px;
-    padding: 1px 5px;
+    border: 1px solid rgba(255,95,135,0.28);
+    border-radius: var(--radius-pill);
+    padding: 1px 6px;
     margin-left: 8px;
     flex-shrink: 0;
     text-transform: uppercase;
@@ -757,7 +690,8 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     z-index: 1;
     border-top: 1px solid var(--border);
     padding: 10px 16px;
-    background: var(--bg-panel);
+    background: rgba(11,11,22,0.9);
+    backdrop-filter: blur(12px);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -771,7 +705,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border-soft) 30%, var(--border-soft) 70%, transparent);
+    background: linear-gradient(90deg, transparent, rgba(124,92,252,0.4) 40%, rgba(34,211,238,0.3) 60%, transparent);
   }
 
   .footer-info {
@@ -781,42 +715,43 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     font-family: var(--mono);
     letter-spacing: -0.01em;
   }
-  .footer-info .hi { color: var(--accent); font-weight: 600; }
+  .footer-info .hi { color: #a78bfa; font-weight: 600; }
   .footer-info .total { color: var(--fg); }
 
   .btn-cancel {
     background: transparent;
     color: var(--fg-dim);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    padding: 6px 16px;
     font-size: 11.5px;
     font-family: var(--sans);
     font-weight: 500;
     cursor: pointer;
-    transition: color var(--t), border-color var(--t), background var(--t);
+    transition: color var(--t), border-color var(--t), background var(--t), transform var(--t);
     letter-spacing: 0.01em;
   }
   .btn-cancel:hover {
     color: var(--fg);
-    border-color: var(--border-soft);
-    background: var(--bg-glass);
+    border-color: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    transform: translateY(-1px);
   }
-  .btn-cancel:active { transform: scale(0.97); }
+  .btn-cancel:active { transform: scale(0.96); }
 
   .btn-generate {
-    background: var(--accent);
-    color: var(--accent-fg);
+    background: linear-gradient(135deg, #7c5cfc 0%, #22d3ee 100%);
+    color: #fff;
     border: none;
-    border-radius: var(--radius);
-    padding: 6px 18px;
+    border-radius: var(--radius-pill);
+    padding: 7px 20px;
     font-size: 11.5px;
     font-family: var(--sans);
     font-weight: 600;
     cursor: pointer;
     letter-spacing: 0.02em;
     transition: opacity var(--t), box-shadow var(--t), transform var(--t);
-    box-shadow: 0 1px 8px var(--accent-glow);
+    box-shadow: 0 2px 16px rgba(124,92,252,0.45), 0 1px 4px rgba(0,0,0,0.3);
     position: relative;
     overflow: hidden;
   }
@@ -824,17 +759,17 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+    background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 55%);
     pointer-events: none;
   }
   .btn-generate:hover:not(:disabled) {
-    opacity: 0.92;
-    box-shadow: 0 2px 16px var(--accent-glow), 0 0 0 3px var(--accent-dim);
+    opacity: 0.9;
+    box-shadow: 0 4px 24px rgba(124,92,252,0.55), 0 0 0 3px rgba(124,92,252,0.18);
     transform: translateY(-1px);
   }
-  .btn-generate:active:not(:disabled) { transform: translateY(0); }
+  .btn-generate:active:not(:disabled) { transform: translateY(0) scale(0.98); }
   .btn-generate:disabled {
-    opacity: 0.25;
+    opacity: 0.2;
     cursor: not-allowed;
     box-shadow: none;
   }
@@ -842,8 +777,11 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   /* ─── Scrollbar ──────────────────────────────────────────────────────── */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #2a2a35; }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(124,92,252,0.4), rgba(34,211,238,0.2));
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(124,92,252,0.6); }
 
   /* ─── Animations ─────────────────────────────────────────────────────── */
   @keyframes slideDown {
@@ -865,8 +803,41 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 <!-- Header -->
 <div class="header">
   <div class="header-icon">
-    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-      <path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h4l1.5 2H13a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 13 14H3a1.5 1.5 0 0 1-1.5-1.5v-9z"/>
+    <svg width="100%" viewBox="0 0 680 690" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1e3a5f"/><stop offset="100%" stop-color="#0d1f35"/>
+        </linearGradient>
+        <linearGradient id="t1" x1="30%" y1="0%" x2="70%" y2="100%">
+          <stop offset="0%" stop-color="#52e89a"/><stop offset="100%" stop-color="#1a9955"/>
+        </linearGradient>
+        <linearGradient id="t2" x1="30%" y1="0%" x2="70%" y2="100%">
+          <stop offset="0%" stop-color="#3dd480"/><stop offset="100%" stop-color="#157a42"/>
+        </linearGradient>
+        <linearGradient id="t3" x1="30%" y1="0%" x2="70%" y2="100%">
+          <stop offset="0%" stop-color="#2abe6a"/><stop offset="100%" stop-color="#0f5e30"/>
+        </linearGradient>
+        <linearGradient id="trk" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#8b5e2e"/><stop offset="100%" stop-color="#c4894a"/>
+        </linearGradient>
+      </defs>
+      <rect width="680" height="680" rx="130" fill="url(#bg)"/>
+      <circle cx="340" cy="290" r="230" fill="none" stroke="#52e89a" stroke-width="1" opacity="0.08"/>
+      <circle cx="340" cy="290" r="190" fill="none" stroke="#52e89a" stroke-width="1" opacity="0.06"/>
+      <rect x="316" y="510" width="48" height="88" rx="10" fill="url(#trk)"/>
+      <rect x="340" y="510" width="24" height="88" rx="10" fill="#5a3610" opacity="0.35"/>
+      <rect x="248" y="590" width="184" height="22" rx="11" fill="#1a9955" opacity="0.35"/>
+      <polygon points="340,330 148,530 532,530" fill="url(#t3)"/>
+      <polygon points="340,330 532,530 436,530" fill="#0a3d1e" opacity="0.22"/>
+      <polygon points="340,210 178,430 502,430" fill="url(#t2)"/>
+      <polygon points="340,210 502,430 421,430" fill="#0a3d1e" opacity="0.2"/>
+      <polygon points="340,108 208,320 472,320" fill="url(#t1)"/>
+      <polygon points="340,108 472,320 406,320" fill="#0a3d1e" opacity="0.18"/>
+      <polygon points="340,108 208,320 274,320" fill="#ffffff" opacity="0.06"/>
+      <polygon points="340,210 178,430 250,430" fill="#ffffff" opacity="0.05"/>
+      <polygon points="340,330 148,530 230,530" fill="#ffffff" opacity="0.04"/>
+      <circle cx="340" cy="108" r="14" fill="#a8f5cc" opacity="0.9"/>
+      <circle cx="340" cy="108" r="7" fill="#ffffff" opacity="0.95"/>
     </svg>
   </div>
   <div class="header-text">
@@ -883,7 +854,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   <button class="btn-ghost" onclick="selectAll()">Select all</button>
   <button class="btn-ghost" onclick="selectNone()">Deselect all</button>
   <button class="btn-ghost" onclick="resetDefaults()">Reset defaults</button>
-  <button class="btn-ghost memory" id="restoreLastBtn" style="display:none" onclick="restoreLastSelection()">↺ Restore last</button>
+  <button class="btn-ghost memory" id="restoreLastBtn" style="display:none" onclick="restoreLastSelection()">Restore last</button>
   <div class="sep"></div>
   <div class="search-wrap">
     <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="1.6">
@@ -894,12 +865,6 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   </div>
   <button class="btn-ghost select-filtered" id="selectFilteredBtn" style="display:none" onclick="selectFiltered()">Select filtered</button>
   <div class="stats-pill" id="statsLabel"><span class="count selected">—</span> / <span class="count">—</span></div>
-</div>
-
-<!-- Legend -->
-<div class="legend">
-  <div class="legend-item"><div class="legend-dot included"></div>Included</div>
-  <div class="legend-item" style="margin-left:14px"><div class="legend-dot excluded"></div>Excluded by default</div>
 </div>
 
 <!-- Tree -->
@@ -919,24 +884,6 @@ const LAST_SELECTION = ${lastSelectionJson};
 
 let nodeMap = {};
 let allFileNodes = [];
-
-// ── File icon helper ────────────────────────────────────────────────────────
-function getFileIconSvg(name, isDir) {
-  if (isDir) {
-    return '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h4l1.5 2H13a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 13 14H3a1.5 1.5 0 0 1-1.5-1.5v-9z" fill="#c9a96a" opacity="0.7"/></svg>';
-  }
-  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-  const colorMap = {
-    js: '#f0db4f', ts: '#3178c6', jsx: '#61dafb', tsx: '#61dafb',
-    css: '#264de4', scss: '#cd6799', html: '#e34c26',
-    json: '#cbcb41', md: '#083fa1', py: '#3572a5',
-    rs: '#dea584', go: '#00add8', rb: '#cc342d',
-    sh: '#89e051', yaml: '#cb171e', yml: '#cb171e',
-    vue: '#41b883', svelte: '#ff3e00', php: '#4f5d95',
-  };
-  const color = colorMap[ext] || '#5a5a72';
-  return \`<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h6l4 4v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="\${color}" opacity="0.55"/><path d="M10 2l4 4h-4V2z" fill="\${color}" opacity="0.9"/></svg>\`;
-}
 
 // ── Build UI ────────────────────────────────────────────────────────────────
 function buildUI() {
@@ -1024,12 +971,6 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
     });
     row.appendChild(cb);
 
-    // file icon
-    const icon = document.createElement('span');
-    icon.className = 'file-icon';
-    icon.innerHTML = getFileIconSvg(node.name, node.isDir);
-    row.appendChild(icon);
-
     // label
     const label = document.createElement('span');
     label.className = 'node-label'
@@ -1042,7 +983,7 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
     if (node.ignoredByDefault) {
       const chip = document.createElement('span');
       chip.className = 'excl-chip';
-      chip.textContent = 'excl';
+      chip.textContent = 'x';
       row.appendChild(chip);
     }
 

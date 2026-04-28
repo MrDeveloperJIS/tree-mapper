@@ -2,10 +2,6 @@
 
 > Snapshot any folder into a single Markdown file — full directory tree, every file's source, and an LLM-ready token count. One click.
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/MrDeveloperJIS.tree-mapper?label=Marketplace&color=5b7cf6)](https://marketplace.visualstudio.com/items?itemName=MrDeveloperJIS.tree-mapper)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/MrDeveloperJIS.tree-mapper?color=3dd68c)](https://marketplace.visualstudio.com/items?itemName=MrDeveloperJIS.tree-mapper)
-[![License: MIT](https://img.shields.io/badge/license-MIT-f59e0b)](LICENSE)
-
 ---
 
 ## What it does
@@ -51,7 +47,7 @@ Right-click any folder in the Explorer → **Tree Mapper: Generate Snapshot**
 **From the status bar**
 Click the **Tree Mapper** item in the bottom-right status bar — it shows live scan state and acts as a shortcut to the command.
 
-After triggering, the **interactive file picker** opens. Confirm your selection and a snapshot is generated. A notification appears with an **Open File** button that auto-dismisses after 3 seconds.
+After triggering, the **interactive file picker** opens. Confirm your selection and a snapshot is generated. A notification appears with an **Open File** button.
 
 ---
 
