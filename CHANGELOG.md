@@ -4,6 +4,26 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.1.0 — 2026-04-28
+
+### Added
+
+- **Last-selection memory** — The file picker now remembers which files were checked in the previous run. Selections are persisted to `.tree/last-selection.json` and automatically restored the next time the picker opens for the same workspace root.
+- **"Restore last selection" toolbar button** — A new button (styled with an accent highlight) appears in the picker toolbar when a saved selection exists, letting users instantly restore their previous choices.
+- **"Select filtered" toolbar button** — A new toolbar button checks only the files currently visible after a filter search, making it easy to include or scope a selection to a specific subfolder or file pattern.
+- **Auto-dismissing success notification** — The "Snapshot saved" notification now automatically dismisses after 3 seconds. The **Open File** button remains available during that window.
+- **File-type colour icons** — Every file row in the picker now shows a small colour-coded icon based on file extension (JS, TS, CSS, JSON, Markdown, Python, Rust, Go, etc.), making it easier to identify files at a glance.
+- **Directories auto-collapse when all children are excluded** — Folders whose entire contents are matched by `treemapper.defaultIgnorePatterns` start collapsed in the picker, reducing noise in large repositories.
+- **Indentation connector lines** — The picker tree now renders vertical guide lines between indent levels, giving the file hierarchy a cleaner, IDE-like appearance.
+
+### Changed
+
+- **Picker UI completely redesigned** — The file picker webview has been rebuilt with a new design system: darker background palette, Geist/Geist Mono fonts, glassmorphism-style header and footer, animated entrance transitions (slide-down header, slide-up footer, fade-in tree), and a subtle SVG noise grain overlay.
+- **Stats pill highlights active selection** — The file count pill in the toolbar now uses an accent-coloured border and highlighted selected count when files are checked, making the current selection state more visible.
+
+
+---
+
 ## v2.0.0 — 2026-04-14
 
 ### Added

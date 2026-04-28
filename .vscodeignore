@@ -17,3 +17,6 @@
 *.md
 !README.md
 !CHANGELOG.md
+
+#Private files of developer
+.private/

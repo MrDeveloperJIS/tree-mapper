@@ -202,21 +202,32 @@ function activate(context) {
     // ── Auto-dismissing "Open File" notification (3 s) ──────────────────────
     const timestamp = path.basename(outFile, '.md');
 
-    const choice = await new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(null), 3000);
+    let openFile = false;
 
-      vscode.window
-        .showInformationMessage(
-          `Tree Mapper: Snapshot saved → .tree/${timestamp}.md`,
-          'Open File'
-        )
-        .then((value) => {
-          clearTimeout(timer);
-          resolve(value ?? null);
-        });
-    });
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Tree Mapper: Snapshot saved → .tree/${timestamp}.md`,
+        cancellable: false,
+      },
+      (_progress) =>
+        new Promise((resolve) => {
+          const timer = setTimeout(resolve, 3000);
 
-    if (choice === 'Open File') {
+          vscode.window
+            .showInformationMessage(
+              `Tree Mapper: Snapshot saved → .tree/${timestamp}.md`,
+              'Open File'
+            )
+            .then((value) => {
+              clearTimeout(timer);
+              openFile = value === 'Open File';
+              resolve();
+            });
+        })
+    );
+
+    if (openFile) {
       const doc = await vscode.workspace.openTextDocument(outFile);
       await vscode.window.showTextDocument(doc);
     }
@@ -300,7 +311,7 @@ function saveLastSelection(rootPath, selected) {
     if (!fs.existsSync(outDir)) {
       fs.mkdirSync(outDir, { recursive: true });
     }
-    fs.writeFileSync(getSelectionFilePath(rootPath), JSON.stringify(selected), 'utf8');
+    fs.writeFileSync(getSelectionFilePath(rootPath), JSON.stringify(selected, null, 2), 'utf8');
   } catch {
     // non-fatal
   }
@@ -317,29 +328,37 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tree Mapper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
-
   :root {
-    --bg:        var(--vscode-editor-background,      #141414);
-    --bg-panel:  var(--vscode-sideBar-background,     #1a1a1a);
-    --bg-input:  var(--vscode-input-background,       #222222);
-    --bg-hover:  var(--vscode-list-hoverBackground,   #1f1f1f);
-    --border:    var(--vscode-panel-border,           #2a2a2a);
-    --fg:        var(--vscode-editor-foreground,      #e0e0e0);
-    --fg-dim:    var(--vscode-descriptionForeground,  #666);
-    --fg-muted:  #444;
-    --accent:    var(--vscode-button-background,      #3b82f6);
-    --accent-fg: var(--vscode-button-foreground,      #fff);
-    --accent-glow: rgba(59,130,246,0.15);
-    --danger-soft: rgba(239,68,68,0.08);
-    --danger-text: #f87171;
-    --danger-border: rgba(239,68,68,0.2);
-    --success: #34d399;
-    --mono: 'JetBrains Mono', 'Consolas', monospace;
-    --sans: 'Inter', var(--vscode-font-family, sans-serif);
-    --radius: 5px;
-    --transition: 0.15s ease;
+    --bg:           var(--vscode-editor-background,      #0d0d0f);
+    --bg-panel:     var(--vscode-sideBar-background,     #111114);
+    --bg-input:     var(--vscode-input-background,       #18181c);
+    --bg-hover:     var(--vscode-list-hoverBackground,   #16161a);
+    --bg-glass:     #ffffff08;
+    --border:       var(--vscode-panel-border,           #222228);
+    --border-soft:  #ffffff0f;
+    --fg:           var(--vscode-editor-foreground,      #e8e8f0);
+    --fg-dim:       var(--vscode-descriptionForeground,  #5a5a72);
+    --fg-muted:     #333340;
+    --accent:       var(--vscode-button-background,      #5b7cf6);
+    --accent-fg:    var(--vscode-button-foreground,      #fff);
+    --accent-dim:   #5b7cf61f;
+    --accent-glow:  #5b7cf633;
+    --accent-line:  #5b7cf659;
+    --success:      #3dd68c;
+    --success-dim:  #3dd68c1a;
+    --danger:       #f16b6b;
+    --danger-dim:   #f16b6b14;
+    --danger-line:  #f16b6b33;
+    --amber:        #f59e0b;
+    --mono:         'Geist Mono', 'JetBrains Mono', 'Consolas', monospace;
+    --sans:         'Geist', var(--vscode-font-family, system-ui, sans-serif);
+    --radius:       6px;
+    --radius-lg:    10px;
+    --ease:         cubic-bezier(0.16, 1, 0.3, 1);
+    --t:            0.18s;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -353,35 +372,63 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     display: grid;
     grid-template-rows: auto auto auto 1fr auto;
     overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── Animated background grain ─────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
   }
 
   /* ─── Header ─────────────────────────────────────────────────────────── */
   .header {
+    position: relative;
+    z-index: 1;
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border);
-    padding: 16px 20px 14px;
+    padding: 14px 20px 13px;
     display: flex;
     align-items: center;
     gap: 12px;
+    animation: slideDown 0.4s var(--ease) both;
   }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-line) 30%, var(--accent-line) 70%, transparent);
+    opacity: 0.5;
+  }
+
   .header-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: var(--accent-glow);
-    border: 1px solid rgba(59,130,246,0.25);
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent-dim), rgba(91,124,246,0.06));
+    border: 1px solid var(--accent-line);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    box-shadow: 0 0 12px var(--accent-glow);
   }
   .header-icon svg { width: 14px; height: 14px; fill: var(--accent); }
-  .header-text {}
+
   .header-title {
     font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.01em;
     color: var(--fg);
+    letter-spacing: -0.01em;
     line-height: 1;
     margin-bottom: 4px;
   }
@@ -394,25 +441,34 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     gap: 6px;
   }
   .project-chip {
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 1px 6px;
-    font-size: 11px;
-    color: var(--fg);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-line);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 10.5px;
+    color: var(--accent);
+    letter-spacing: 0.01em;
+    font-weight: 500;
   }
-  .header-actions { margin-left: auto; display: flex; gap: 6px; }
+  .header-hint {
+    color: var(--fg-dim);
+    font-size: 10.5px;
+  }
 
   /* ─── Toolbar ────────────────────────────────────────────────────────── */
   .toolbar {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 20px;
+    gap: 6px;
+    padding: 8px 16px;
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
+    animation: slideDown 0.4s 0.05s var(--ease) both;
   }
+
   .btn-ghost {
     background: transparent;
     color: var(--fg-dim);
@@ -423,45 +479,52 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     font-family: var(--sans);
     font-weight: 500;
     cursor: pointer;
-    letter-spacing: 0.02em;
-    transition: color var(--transition), border-color var(--transition), background var(--transition);
+    letter-spacing: 0.01em;
+    transition: color var(--t), border-color var(--t), background var(--t), box-shadow var(--t);
     white-space: nowrap;
+    line-height: 1.6;
   }
   .btn-ghost:hover {
     color: var(--fg);
-    border-color: var(--border);
-    background: var(--bg-input);
+    border-color: var(--border-soft);
+    background: var(--bg-glass);
   }
+  .btn-ghost:active { transform: scale(0.97); }
+
   .btn-ghost.memory {
     color: var(--accent);
-    border-color: rgba(59,130,246,0.3);
-    background: var(--accent-glow);
+    border-color: var(--accent-line);
+    background: var(--accent-dim);
   }
   .btn-ghost.memory:hover {
-    border-color: rgba(59,130,246,0.55);
-    background: rgba(59,130,246,0.22);
+    background: rgba(91,124,246,0.2);
+    box-shadow: 0 0 8px var(--accent-glow);
   }
+
   .btn-ghost.select-filtered {
     color: var(--success);
-    border-color: rgba(52,211,153,0.3);
-    background: rgba(52,211,153,0.07);
+    border-color: #3dd68c40;
+    background: var(--success-dim);
   }
   .btn-ghost.select-filtered:hover {
-    border-color: rgba(52,211,153,0.55);
-    background: rgba(52,211,153,0.15);
+    background: #3dd68c2e;
+    box-shadow: 0 0 8px #3dd68c26;
   }
-  .divider-v {
+
+  .sep {
     width: 1px;
-    height: 16px;
+    height: 14px;
     background: var(--border);
     flex-shrink: 0;
+    margin: 0 2px;
   }
+
   .search-wrap {
     flex: 1;
-    min-width: 100px;
+    min-width: 120px;
     position: relative;
   }
-  .search-wrap svg {
+  .search-icon {
     position: absolute;
     left: 9px;
     top: 50%;
@@ -470,7 +533,10 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     height: 12px;
     stroke: var(--fg-muted);
     pointer-events: none;
+    transition: stroke var(--t);
   }
+  .search-wrap:focus-within .search-icon { stroke: var(--accent); }
+
   .search-input {
     width: 100%;
     background: var(--bg-input);
@@ -481,14 +547,18 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     font-size: 11.5px;
     padding: 5px 10px 5px 28px;
     outline: none;
-    transition: border-color var(--transition);
+    transition: border-color var(--t), box-shadow var(--t);
+    letter-spacing: -0.01em;
   }
   .search-input::placeholder { color: var(--fg-muted); }
-  .search-input:focus { border-color: rgba(59,130,246,0.4); }
+  .search-input:focus {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
 
   .stats-pill {
     margin-left: auto;
-    font-size: 11px;
+    font-size: 10.5px;
     font-family: var(--mono);
     color: var(--fg-dim);
     white-space: nowrap;
@@ -496,53 +566,81 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     border: 1px solid var(--border);
     border-radius: 20px;
     padding: 3px 10px;
+    letter-spacing: 0.01em;
+    transition: border-color var(--t);
   }
   .stats-pill .count { color: var(--fg); font-weight: 500; }
+  .stats-pill.has-selection { border-color: var(--accent-line); }
+  .stats-pill .count.selected { color: var(--accent); }
 
   /* ─── Legend ─────────────────────────────────────────────────────────── */
   .legend {
+    position: relative;
+    z-index: 1;
     display: flex;
     gap: 0;
-    padding: 0 20px;
+    padding: 0 16px;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+    animation: slideDown 0.4s 0.08s var(--ease) both;
   }
   .legend-item {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 10.5px;
+    font-size: 10px;
     color: var(--fg-dim);
-    letter-spacing: 0.02em;
-    padding: 6px 12px 6px 0;
+    letter-spacing: 0.03em;
+    padding: 5px 14px 5px 0;
     font-family: var(--mono);
+    text-transform: uppercase;
   }
   .legend-dot {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .legend-dot.included { background: var(--success); }
-  .legend-dot.excluded { background: var(--danger-text); }
+  .legend-dot.included {
+    background: var(--success);
+    box-shadow: 0 0 5px rgba(61,214,140,0.5);
+  }
+  .legend-dot.excluded {
+    background: var(--danger);
+    box-shadow: 0 0 5px rgba(241,107,107,0.4);
+  }
 
   /* ─── Tree ───────────────────────────────────────────────────────────── */
   .tree-scroll {
+    position: relative;
+    z-index: 1;
     overflow-y: auto;
-    padding: 6px 0 12px;
+    padding: 6px 0 16px;
+    animation: fadeIn 0.5s 0.12s var(--ease) both;
   }
 
   .tree-row {
     display: flex;
     align-items: center;
-    padding: 0 20px 0 0;
+    padding: 0 16px 0 0;
     height: 26px;
     cursor: default;
     user-select: none;
-    border-radius: 0;
-    transition: background var(--transition);
+    transition: background var(--t);
+    position: relative;
   }
   .tree-row:hover { background: var(--bg-hover); }
+  .tree-row:hover::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    opacity: 0.5;
+    border-radius: 0 2px 2px 0;
+  }
   .tree-row.hidden { display: none; }
 
   /* Indentation connector lines */
@@ -562,6 +660,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     bottom: 0;
     width: 1px;
     background: var(--border);
+    opacity: 0.6;
   }
 
   .toggle-zone {
@@ -572,14 +671,20 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    border-radius: 3px;
+    border-radius: 4px;
     color: var(--fg-muted);
-    transition: color var(--transition), background var(--transition);
+    transition: color var(--t), background var(--t);
   }
   .toggle-zone:hover { color: var(--fg); background: var(--bg-input); }
   .toggle-zone.leaf { cursor: default; }
   .toggle-zone.leaf:hover { background: transparent; }
-  .toggle-zone svg { width: 10px; height: 10px; stroke: currentColor; fill: none; transition: transform 0.15s; }
+  .toggle-zone svg {
+    width: 10px;
+    height: 10px;
+    stroke: currentColor;
+    fill: none;
+    transition: transform 0.2s var(--ease);
+  }
   .toggle-zone.collapsed svg { transform: rotate(-90deg); }
 
   .node-cb {
@@ -589,8 +694,20 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     margin: 0 7px 0 5px;
     cursor: pointer;
     accent-color: var(--accent);
-    border-radius: 2px;
+    border-radius: 3px;
   }
+
+  .file-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    margin-right: 5px;
+    opacity: 0.5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .file-icon svg { width: 12px; height: 12px; }
 
   .node-label {
     font-family: var(--mono);
@@ -600,19 +717,23 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     text-overflow: ellipsis;
     flex: 1;
     color: var(--fg);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    line-height: 1;
   }
-  .node-label.dir-label { color: var(--vscode-symbolIcon-folderForeground, #c9a96a); }
-  .node-label.dim { opacity: 0.4; }
+  .node-label.dir-label {
+    color: var(--vscode-symbolIcon-folderForeground, #c9a96a);
+    font-weight: 500;
+  }
+  .node-label.dim { opacity: 0.3; }
 
   .excl-chip {
-    font-size: 9.5px;
+    font-size: 9px;
     font-family: var(--sans);
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    background: var(--danger-soft);
-    color: var(--danger-text);
-    border: 1px solid var(--danger-border);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    background: var(--danger-dim);
+    color: var(--danger);
+    border: 1px solid var(--danger-line);
     border-radius: 3px;
     padding: 1px 5px;
     margin-left: 8px;
@@ -621,30 +742,47 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   }
 
   .size-tag {
-    font-size: 10px;
+    font-size: 9.5px;
     font-family: var(--mono);
     color: var(--fg-muted);
     margin-left: 8px;
-    margin-right: 4px;
+    margin-right: 2px;
     flex-shrink: 0;
+    letter-spacing: -0.01em;
   }
 
   /* ─── Footer ─────────────────────────────────────────────────────────── */
   .footer {
+    position: relative;
+    z-index: 1;
     border-top: 1px solid var(--border);
-    padding: 10px 20px;
+    padding: 10px 16px;
     background: var(--bg-panel);
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    animation: slideUp 0.4s var(--ease) both;
   }
+
+  .footer::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-soft) 30%, var(--border-soft) 70%, transparent);
+  }
+
   .footer-info {
     flex: 1;
-    font-size: 11.5px;
+    font-size: 11px;
     color: var(--fg-dim);
     font-family: var(--mono);
+    letter-spacing: -0.01em;
   }
-  .footer-info .hi { color: var(--fg); font-weight: 500; }
+  .footer-info .hi { color: var(--accent); font-weight: 600; }
+  .footer-info .total { color: var(--fg); }
 
   .btn-cancel {
     background: transparent;
@@ -652,38 +790,74 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 6px 14px;
-    font-size: 12px;
+    font-size: 11.5px;
     font-family: var(--sans);
+    font-weight: 500;
     cursor: pointer;
-    transition: color var(--transition), border-color var(--transition);
+    transition: color var(--t), border-color var(--t), background var(--t);
+    letter-spacing: 0.01em;
   }
-  .btn-cancel:hover { color: var(--fg); border-color: #444; }
+  .btn-cancel:hover {
+    color: var(--fg);
+    border-color: var(--border-soft);
+    background: var(--bg-glass);
+  }
+  .btn-cancel:active { transform: scale(0.97); }
 
   .btn-generate {
     background: var(--accent);
     color: var(--accent-fg);
     border: none;
     border-radius: var(--radius);
-    padding: 6px 16px;
-    font-size: 12px;
+    padding: 6px 18px;
+    font-size: 11.5px;
     font-family: var(--sans);
     font-weight: 600;
     cursor: pointer;
     letter-spacing: 0.02em;
-    transition: opacity var(--transition), box-shadow var(--transition);
-    box-shadow: 0 0 0 0 var(--accent-glow);
+    transition: opacity var(--t), box-shadow var(--t), transform var(--t);
+    box-shadow: 0 1px 8px var(--accent-glow);
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-generate::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+    pointer-events: none;
   }
   .btn-generate:hover:not(:disabled) {
-    opacity: 0.9;
-    box-shadow: 0 0 0 4px var(--accent-glow);
+    opacity: 0.92;
+    box-shadow: 0 2px 16px var(--accent-glow), 0 0 0 3px var(--accent-dim);
+    transform: translateY(-1px);
   }
-  .btn-generate:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-generate:active:not(:disabled) { transform: translateY(0); }
+  .btn-generate:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
 
-  /* scrollbar */
-  ::-webkit-scrollbar { width: 5px; }
+  /* ─── Scrollbar ──────────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+  ::-webkit-scrollbar-thumb:hover { background: #2a2a35; }
+
+  /* ─── Animations ─────────────────────────────────────────────────────── */
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
 </style>
 </head>
 <body>
@@ -692,14 +866,14 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 <div class="header">
   <div class="header-icon">
     <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-      <path d="M2 3h5l1.5 2H14v8H2V3z"/>
+      <path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h4l1.5 2H13a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 13 14H3a1.5 1.5 0 0 1-1.5-1.5v-9z"/>
     </svg>
   </div>
   <div class="header-text">
     <div class="header-title">Select Files for Snapshot</div>
     <div class="header-sub">
       <span class="project-chip">${projectName}</span>
-      <span>Files ignored by default are unchecked — enable them individually</span>
+      <span class="header-hint">Excluded files are unchecked — enable them individually</span>
     </div>
   </div>
 </div>
@@ -710,22 +884,22 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   <button class="btn-ghost" onclick="selectNone()">Deselect all</button>
   <button class="btn-ghost" onclick="resetDefaults()">Reset defaults</button>
   <button class="btn-ghost memory" id="restoreLastBtn" style="display:none" onclick="restoreLastSelection()">↺ Restore last</button>
-  <div class="divider-v"></div>
+  <div class="sep"></div>
   <div class="search-wrap">
-    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="1.5">
+    <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="1.6">
       <circle cx="6.5" cy="6.5" r="4"/>
       <path d="M11 11l3 3" stroke-linecap="round"/>
     </svg>
     <input class="search-input" id="searchInput" type="text" placeholder="Filter files…" oninput="filterTree(this.value)">
   </div>
   <button class="btn-ghost select-filtered" id="selectFilteredBtn" style="display:none" onclick="selectFiltered()">Select filtered</button>
-  <div class="stats-pill" id="statsLabel"><span class="count">—</span> / <span class="count">—</span></div>
+  <div class="stats-pill" id="statsLabel"><span class="count selected">—</span> / <span class="count">—</span></div>
 </div>
 
 <!-- Legend -->
 <div class="legend">
-  <div class="legend-item"><div class="legend-dot included"></div>Included by default</div>
-  <div class="legend-item" style="margin-left:16px"><div class="legend-dot excluded"></div>Excluded by default</div>
+  <div class="legend-item"><div class="legend-dot included"></div>Included</div>
+  <div class="legend-item" style="margin-left:14px"><div class="legend-dot excluded"></div>Excluded by default</div>
 </div>
 
 <!-- Tree -->
@@ -743,8 +917,26 @@ const vscode = acquireVsCodeApi();
 const TREE = ${treeJson};
 const LAST_SELECTION = ${lastSelectionJson};
 
-let nodeMap = {};      // rel → node
-let allFileNodes = []; // flat list of file nodes
+let nodeMap = {};
+let allFileNodes = [];
+
+// ── File icon helper ────────────────────────────────────────────────────────
+function getFileIconSvg(name, isDir) {
+  if (isDir) {
+    return '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h4l1.5 2H13a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 13 14H3a1.5 1.5 0 0 1-1.5-1.5v-9z" fill="#c9a96a" opacity="0.7"/></svg>';
+  }
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  const colorMap = {
+    js: '#f0db4f', ts: '#3178c6', jsx: '#61dafb', tsx: '#61dafb',
+    css: '#264de4', scss: '#cd6799', html: '#e34c26',
+    json: '#cbcb41', md: '#083fa1', py: '#3572a5',
+    rs: '#dea584', go: '#00add8', rb: '#cc342d',
+    sh: '#89e051', yaml: '#cb171e', yml: '#cb171e',
+    vue: '#41b883', svelte: '#ff3e00', php: '#4f5d95',
+  };
+  const color = colorMap[ext] || '#5a5a72';
+  return \`<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h6l4 4v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="\${color}" opacity="0.55"/><path d="M10 2l4 4h-4V2z" fill="\${color}" opacity="0.9"/></svg>\`;
+}
 
 // ── Build UI ────────────────────────────────────────────────────────────────
 function buildUI() {
@@ -755,16 +947,11 @@ function buildUI() {
   renderLevel(TREE, container, 0, []);
   updateStats();
 
-  // Show "Restore last" button only if a last selection exists
   if (LAST_SELECTION && LAST_SELECTION.length > 0) {
     document.getElementById('restoreLastBtn').style.display = '';
   }
 }
 
-/**
- * Returns true if ALL file descendants of a node are ignoredByDefault.
- * Used to decide whether to collapse a dir by default.
- */
 function allDescendantsExcluded(node) {
   if (!node.isDir || !node.children || node.children.length === 0) return false;
   function check(children) {
@@ -780,12 +967,6 @@ function allDescendantsExcluded(node) {
   return check(node.children);
 }
 
-/**
- * @param {Array}     nodes
- * @param {Element}   container
- * @param {number}    depth
- * @param {boolean[]} ancestorIsLast  - whether each ancestor level is the last child
- */
 function renderLevel(nodes, container, depth, ancestorIsLast) {
   nodes.forEach((node, idx) => {
     nodeMap[node.rel] = node;
@@ -793,27 +974,25 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
 
     const isLast = idx === nodes.length - 1;
 
-    // ── Row ────────────────────────────────────────────────────────────────
     const row = document.createElement('div');
     row.className = 'tree-row';
     row.dataset.rel = node.rel;
     row.dataset.isDir = node.isDir ? '1' : '0';
 
-    // indent blocks (one per ancestor level)
+    // indent blocks
     for (let i = 0; i < depth; i++) {
       const block = document.createElement('span');
       block.className = 'indent-block' + (ancestorIsLast[i] ? '' : ' has-line');
       row.appendChild(block);
     }
 
-    // toggle chevron for dirs, spacer for files
+    // toggle chevron
     const tog = document.createElement('span');
     tog.className = 'toggle-zone' + (node.isDir && node.children && node.children.length ? '' : ' leaf');
     tog.innerHTML = node.isDir && node.children && node.children.length
       ? '<svg viewBox="0 0 10 10" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,3 5,7 8,3"/></svg>'
       : '';
 
-    // Determine if this dir should start collapsed (all children excluded)
     const startCollapsed = node.isDir && node.children && node.children.length > 0
       && allDescendantsExcluded(node);
 
@@ -845,6 +1024,12 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
     });
     row.appendChild(cb);
 
+    // file icon
+    const icon = document.createElement('span');
+    icon.className = 'file-icon';
+    icon.innerHTML = getFileIconSvg(node.name, node.isDir);
+    row.appendChild(icon);
+
     // label
     const label = document.createElement('span');
     label.className = 'node-label'
@@ -857,7 +1042,7 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
     if (node.ignoredByDefault) {
       const chip = document.createElement('span');
       chip.className = 'excl-chip';
-      chip.textContent = 'excluded';
+      chip.textContent = 'excl';
       row.appendChild(chip);
     }
 
@@ -871,11 +1056,10 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
 
     container.appendChild(row);
 
-    // ── Children ──────────────────────────────────────────────────────────
+    // children
     if (node.isDir && node.children && node.children.length) {
       const childWrap = document.createElement('div');
       childWrap.dataset.parentRel = node.rel;
-      // Collapse by default if all descendants are excluded
       if (startCollapsed) childWrap.style.display = 'none';
       renderLevel(node.children, childWrap, depth + 1, [...ancestorIsLast, isLast]);
       container.appendChild(childWrap);
@@ -952,11 +1136,9 @@ function resetDefaults() {
   updateStats();
 }
 
-// ── Memory: restore last selection ──────────────────────────────────────────
 function restoreLastSelection() {
   if (!LAST_SELECTION || !LAST_SELECTION.length) return;
   const lastSet = new Set(LAST_SELECTION);
-  // First uncheck all files
   document.querySelectorAll('input.node-cb').forEach(cb => {
     const node = nodeMap[cb.dataset.rel];
     if (!node || node.isDir) return;
@@ -975,12 +1157,9 @@ function filterTree(q) {
   if (!q) {
     document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('hidden'));
     document.querySelectorAll('[data-parent-rel]').forEach(w => {
-      // Restore collapse state: re-hide if all-excluded dir
       const parentRel = w.dataset.parentRel;
       const node = nodeMap[parentRel];
       if (node && allDescendantsExcluded(node)) {
-        // Only restore collapsed if not manually expanded by user
-        // We check the toggle zone state
         const tog = document.querySelector('.tree-row[data-rel="' + CSS.escape(parentRel) + '"] .toggle-zone');
         if (tog && tog.classList.contains('collapsed')) {
           w.style.display = 'none';
@@ -995,28 +1174,21 @@ function filterTree(q) {
     return;
   }
 
-  // When filtering: expand all wrappers so we can search across them
   document.querySelectorAll('[data-parent-rel]').forEach(w => w.style.display = '');
-
   document.querySelectorAll('.tree-row').forEach(row => {
     const rel = row.dataset.rel || '';
     row.classList.toggle('hidden', !rel.toLowerCase().includes(q));
   });
-
-  // Show "Select filtered" button whenever there's an active query
   filterBtn.style.display = '';
 }
 
-// ── Select filtered files ────────────────────────────────────────────────────
 function selectFiltered() {
-  // Check all visible (non-hidden) file rows
   document.querySelectorAll('.tree-row:not(.hidden)').forEach(row => {
     if (row.dataset.isDir === '1') return;
     const rel = row.dataset.rel;
     const cb = getCb(rel);
     if (cb) { cb.checked = true; cb.indeterminate = false; }
   });
-  // Recompute all ancestor states
   allFileNodes.forEach(n => updateAncestors(n.rel));
   updateStats();
 }
@@ -1030,10 +1202,13 @@ function updateStats() {
     total++;
     if (cb.checked) selected++;
   });
+
   const label = document.getElementById('statsLabel');
-  label.innerHTML = '<span class="count">' + selected + '</span> / <span class="count">' + total + '</span>';
+  label.innerHTML = '<span class="count selected">' + selected + '</span> / <span class="count">' + total + '</span>';
+  label.classList.toggle('has-selection', selected > 0);
+
   document.getElementById('footerInfo').innerHTML =
-    '<span class="hi">' + selected + '</span> file' + (selected !== 1 ? 's' : '') + ' will be included in the snapshot';
+    '<span class="hi">' + selected + '</span> <span class="total">/ ' + total + ' files</span> selected for snapshot';
   document.getElementById('generateBtn').disabled = selected === 0;
 }
 
