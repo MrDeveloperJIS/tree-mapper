@@ -505,7 +505,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     color: var(--fg);
     font-family: var(--mono);
     font-size: 11.5px;
-    padding: 5px 12px 5px 30px;
+    padding: 5px 26px 5px 30px;
     outline: none;
     transition: border-color var(--t), box-shadow var(--t);
     letter-spacing: -0.01em;
@@ -514,6 +514,33 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   .search-input:focus {
     border-color: rgba(124,92,252,0.5);
     box-shadow: 0 0 0 3px rgba(124,92,252,0.12);
+  }
+  .search-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    padding: 0;
+    border-radius: 50%;
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: background var(--t), color var(--t);
+  }
+  .search-clear svg {
+    width: 9px;
+    height: 9px;
+    stroke: currentColor;
+  }
+  .search-clear:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--fg);
   }
 
   .stats-pill {
@@ -843,8 +870,14 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
       <path d="M11 11l3 3" stroke-linecap="round"/>
     </svg>
     <input class="search-input" id="searchInput" type="text" placeholder="Filter files…" oninput="filterTree(this.value)">
+    <button class="search-clear" id="searchClearBtn" style="display:none" onclick="clearSearch()" aria-label="Clear search" type="button">
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="1.8">
+        <path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/>
+      </svg>
+    </button>
   </div>
   <button class="btn-ghost select-filtered" id="selectFilteredBtn" style="display:none" onclick="selectFiltered()">Select filtered</button>
+  <button class="btn-ghost deselect-filtered" id="deselectFilteredBtn" style="display:none" onclick="deselectFiltered()">Deselect filtered</button>
   <div class="stats-pill" id="statsLabel"><span class="count selected">—</span> / <span class="count">—</span></div>
 </div>
 
@@ -1075,6 +1108,10 @@ function restoreLastSelection() {
 function filterTree(q) {
   q = q.toLowerCase().trim();
   const filterBtn = document.getElementById('selectFilteredBtn');
+  const deselectBtn = document.getElementById('deselectFilteredBtn');
+  const clearBtn = document.getElementById('searchClearBtn');
+
+  clearBtn.style.display = q ? 'flex' : 'none';
 
   if (!q) {
     document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('hidden'));
@@ -1093,6 +1130,7 @@ function filterTree(q) {
       }
     });
     filterBtn.style.display = 'none';
+    deselectBtn.style.display = 'none';
     return;
   }
 
@@ -1102,6 +1140,14 @@ function filterTree(q) {
     row.classList.toggle('hidden', !rel.toLowerCase().includes(q));
   });
   filterBtn.style.display = '';
+  deselectBtn.style.display = '';
+}
+
+function clearSearch() {
+  const input = document.getElementById('searchInput');
+  input.value = '';
+  filterTree('');
+  input.focus();
 }
 
 function selectFiltered() {
@@ -1114,6 +1160,19 @@ function selectFiltered() {
   allFileNodes.forEach(n => updateAncestors(n.rel));
   updateStats();
 }
+
+function deselectFiltered() {
+  document.querySelectorAll('.tree-row:not(.hidden)').forEach(row => {
+    if (row.dataset.isDir === '1') return;
+    const rel = row.dataset.rel;
+    const cb = getCb(rel);
+    if (cb) { cb.checked = false; cb.indeterminate = false; }
+  });
+  allFileNodes.forEach(n => updateAncestors(n.rel));
+  updateStats();
+}
+
+
 
 // ── Stats ───────────────────────────────────────────────────────────────────
 function updateStats() {

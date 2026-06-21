@@ -4,6 +4,15 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.2.2 — 2026-06-21
+
+### Added
+
+- **"Deselect filtered" toolbar button** — Appears next to **Select filtered** whenever a search filter is active, letting you uncheck only the files currently visible in the filtered tree without affecting the rest of your selection.
+- **Clear (×) button in the search box** — A small clear button now appears inside the filter input as soon as you start typing, letting you reset the search and restore the full tree view in one click.
+
+---
+
 ## v2.2.1 — 2026-05-06
 
 ### Fixed

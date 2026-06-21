@@ -17,25 +17,6 @@ Snapshots are saved to `.tree/yyyy-mm-dd-hh-mm-ss.md` inside the `.tree` folder.
 
 ---
 
-## Installation
-
-**From the Marketplace** *(recommended)*
-
-Open Extensions (`Ctrl+Shift+X`), search **Tree Mapper**, and click Install — or visit the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=MrDeveloperJIS.tree-mapper) directly.
-
-```
-ext install MrDeveloperJIS.tree-mapper
-```
-
-**From a VSIX file**
-
-Download from the [Releases page](https://github.com/MrDeveloperJIS/tree-mapper/releases), then:
-
-- Extensions panel → `⋯` menu → **Install from VSIX…**
-- Or via terminal: `code --install-extension path/to/tree-mapper-x.x.x.vsix`
-
----
-
 ## Usage
 
 **Snapshot a folder**
@@ -64,11 +45,11 @@ Before generating, Tree Mapper opens a full-screen webview panel with every file
 | **Reset defaults** | Restore the default checked/unchecked state |
 | **Restore last** | Re-apply the selection from your previous run *(appears when a saved selection exists)* |
 | **Select filtered** | Check only the files currently visible in the search filter |
+| **Deselect filtered** | Uncheck only the files currently visible in the search filter |
 | **Filter** | Type to narrow the tree by filename or path |
 
 **Other picker features:**
 
-- **File-type colour icons** — each file shows a colour-coded icon based on its extension (JS, TS, CSS, JSON, Markdown, Python, Rust, Go, and more)
 - **Indentation connector lines** — vertical guide lines between nesting levels for clear hierarchy
 - **Auto-collapsed excluded dirs** — folders whose entire contents are excluded by default patterns start collapsed, reducing noise in large repos
 - **Live file count** — the footer updates in real time as you check and uncheck files
@@ -130,6 +111,25 @@ When a `.git` folder is detected, Tree Mapper automatically adds `.tree/` to you
 | `treemapper.maxFileSizeKB` | `2048` | Files larger than this (in KB) are excluded from snapshot contents even if checked in the picker. They appear in the `Files skipped` count. |
 | `treemapper.keepLastSnapshots` | `10` | Number of recent snapshots to retain in `.tree/`. Oldest are deleted automatically after each run. |
 | `treemapper.defaultIgnorePatterns` | `.tree/`, `node_modules/`, `.git/`, `dist/`, `build/`, `**/*.log` | Glob patterns unchecked by default in the file picker. Users can still check these individually. `.tree/` is always excluded and cannot be overridden. |
+
+---
+
+## Installation
+
+**From the Marketplace** *(recommended)*
+
+Open Extensions (`Ctrl+Shift+X`), search **Tree Mapper**, and click Install — or visit the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=MrDeveloperJIS.tree-mapper) directly.
+
+```
+ext install MrDeveloperJIS.tree-mapper
+```
+
+**From a VSIX file**
+
+Download from the [Releases page](https://github.com/MrDeveloperJIS/tree-mapper/releases), then:
+
+- Extensions panel → `⋯` menu → **Install from VSIX…**
+- Or via terminal: `code --install-extension path/to/tree-mapper-x.x.x.vsix`
 
 ---
 
