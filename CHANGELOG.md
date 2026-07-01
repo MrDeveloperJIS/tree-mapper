@@ -4,6 +4,14 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.2.3 — 2026-07-01
+
+### Fixed
+
+- **Toolbar buttons no longer overlap in purpose during search** — Previously, **Select filtered** / **Deselect filtered** appeared alongside **Select all** / **Deselect all** while a search filter was active, making it unclear which pair applied. Now only one pair is shown at a time: **Select all** / **Deselect all** while the search box is empty, and **Select filtered** / **Deselect filtered** while a filter is active. Clearing the search restores the original pair.
+
+---
+
 ## v2.2.2 — 2026-06-21
 
 ### Added

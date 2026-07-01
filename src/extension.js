@@ -859,8 +859,8 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 
 <!-- Toolbar -->
 <div class="toolbar">
-  <button class="btn-ghost" onclick="selectAll()">Select all</button>
-  <button class="btn-ghost" onclick="selectNone()">Deselect all</button>
+<button class="btn-ghost" id="selectAllBtn" onclick="selectAll()">Select all</button>
+<button class="btn-ghost" id="deselectAllBtn" onclick="selectNone()">Deselect all</button>
   <button class="btn-ghost" onclick="resetDefaults()">Reset defaults</button>
   <button class="btn-ghost memory" id="restoreLastBtn" style="display:none" onclick="restoreLastSelection()">Restore last</button>
   <div class="sep"></div>
@@ -1109,6 +1109,8 @@ function filterTree(q) {
   q = q.toLowerCase().trim();
   const filterBtn = document.getElementById('selectFilteredBtn');
   const deselectBtn = document.getElementById('deselectFilteredBtn');
+  const selectAllBtn = document.getElementById('selectAllBtn');
+  const deselectAllBtn = document.getElementById('deselectAllBtn');
   const clearBtn = document.getElementById('searchClearBtn');
 
   clearBtn.style.display = q ? 'flex' : 'none';
@@ -1131,6 +1133,8 @@ function filterTree(q) {
     });
     filterBtn.style.display = 'none';
     deselectBtn.style.display = 'none';
+    selectAllBtn.style.display = '';
+    deselectAllBtn.style.display = '';
     return;
   }
 
@@ -1141,6 +1145,8 @@ function filterTree(q) {
   });
   filterBtn.style.display = '';
   deselectBtn.style.display = '';
+  selectAllBtn.style.display = 'none';
+  deselectAllBtn.style.display = 'none';
 }
 
 function clearSearch() {
