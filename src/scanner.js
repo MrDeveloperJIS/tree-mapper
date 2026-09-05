@@ -17,6 +17,30 @@ const ignore = require('ignore');
  *     ignored: number,        // files flagged as ignoredByDefault
  *   }
  */
+const BINARY_SNIFF_BYTES = 8192;
+
+/**
+ * Cheap binary-file detection: reads only the first BINARY_SNIFF_BYTES of the
+ * file (not the whole thing) and checks for a null byte, the same heuristic
+ * git and most editors use. Avoids loading large files fully into memory
+ * just to classify them.
+ */
+function isLikelyBinary(fullPath) {
+  let fd;
+  try {
+    fd = fs.openSync(fullPath, 'r');
+    const buf = Buffer.alloc(BINARY_SNIFF_BYTES);
+    const bytesRead = fs.readSync(fd, buf, 0, BINARY_SNIFF_BYTES, 0);
+    return buf.subarray(0, bytesRead).includes(0);
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* non-fatal */ }
+    }
+  }
+}
+
 async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatterns = []) {
   const ig = ignore();
   if (defaultIgnorePatterns.length > 0) {
@@ -64,9 +88,9 @@ async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatter
         if (size > maxBytes) {
           skipped = true;
         } else {
-          // Binary check
-          const buf = fs.readFileSync(path.join(rootPath, cleanRel));
-          if (buf.includes(0)) {
+          // Binary check — only sniff the first few KB instead of reading
+          // the whole file into memory just to look for a null byte.
+          if (isLikelyBinary(path.join(rootPath, cleanRel))) {
             isBinary = true;
             skipped = true;
           }

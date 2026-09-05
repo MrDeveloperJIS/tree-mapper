@@ -4,6 +4,22 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.3.0 — 2026-09-05
+
+### Added
+
+- **`## Index` section** — Every snapshot now opens with an Index linking to `Workspace Tree`, `Snapshot Tree`, `Skipped Files` (when present), and `File Contents`.
+- **Clickable file jump-list under `## File Contents`** — A linked list of every included file appears right after the `File Contents` heading, so a specific file can be found instantly in large snapshots instead of scrolling through the whole document.
+- **"Back to top" link after every file** — Each file's code block is followed by a link back to the `File Contents` list, so you can jump to the next file without scrolling.
+- All new links use plain markdown heading anchors (no `<a>` tags), slugged and de-duplicated the same way GitHub and VS Code's Markdown preview generate anchors automatically, so filenames that would otherwise collide (e.g. `ab/cde.js` and `abc/de.js`) still resolve to distinct, working links.
+
+### Fixed
+
+- **Removed the artificial ~1 s delay before generation** — Introduced in v2.2.0 as a placeholder, this fixed `setTimeout` ran on every snapshot regardless of size and did no actual work. Progress reporting is now tied to the real file-reading step instead.
+- **O(n²) file lookups during generation** — Selected files were matched against the full scan results with repeated `Array#find()` calls (twice per file). This is now a single `Map` lookup per file, which meaningfully speeds up generation on workspaces with a large number of selected files.
+
+---
+
 ## v2.2.3 — 2026-07-01
 
 ### Fixed

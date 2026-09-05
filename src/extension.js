@@ -93,20 +93,9 @@ function activate(context) {
     // ── Step 3: Generate snapshot from selected files ────────────────────────
     updateStatusBar('$(sync~spin) Generating…', 'Tree Mapper: Generating snapshot…');
 
-    let outFile = null;
-
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: 'Tree Mapper', cancellable: false },
-      async (progress) => {
-        progress.report({ message: `Building tree for ${selected.length} files…` });
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-    );
-
-    const selectedPaths = selected.filter((rel) => {
-      const entry = allEntries.entries.find((e) => e.rel === rel && !e.isDir);
-      return !!entry;
-    });
+    // O(1) lookups by relative path instead of Array#find() per file, which
+    // was effectively O(n²) over the whole selection.
+    const entryByRel = new Map(allEntries.entries.map((e) => [e.rel, e]));
 
     let totalSizeBytes = 0;
     let skippedCount = 0;
@@ -114,9 +103,9 @@ function activate(context) {
     const skippedFiles = [];
     const validFiles = [];
 
-    for (const rel of selectedPaths) {
-      const entry = allEntries.entries.find((e) => e.rel === rel);
-      if (!entry) continue;
+    for (const rel of selected) {
+      const entry = entryByRel.get(rel);
+      if (!entry || entry.isDir) continue;
 
       if (entry.skipped && !entry.isBinary && entry.size <= (maxFileSizeKB * 1024)) {
         entry.skipped = false;
@@ -153,15 +142,26 @@ function activate(context) {
       allEntries.entries,
     );
 
-    const markdown = renderMarkdown(
-      rootPath,
-      workspaceTreeLines,
-      snapshotTreeLines,
-      validFiles,
-      totalSizeBytes,
-      skippedCount,
-      excludedSet.size,
-      skippedFiles,
+    // The actual slow part is reading every selected file's contents — wrap
+    // that in a real progress notification instead of an artificial delay.
+    let markdown;
+    let outFile = null;
+
+    await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: 'Tree Mapper', cancellable: false },
+      async (progress) => {
+        progress.report({ message: `Reading ${validFiles.length} file(s)…` });
+        markdown = renderMarkdown(
+          rootPath,
+          workspaceTreeLines,
+          snapshotTreeLines,
+          validFiles,
+          totalSizeBytes,
+          skippedCount,
+          excludedSet.size,
+          skippedFiles,
+        );
+      }
     );
 
     const outDir = path.join(rootPath, '.tree');
