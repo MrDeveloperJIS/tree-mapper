@@ -4,9 +4,6 @@
 # Version control
 .git/**
 
-# Generated output — exclude from package
-.tree/**
-
 # Dev tooling
 .vscode/**
 
@@ -18,5 +15,8 @@
 !README.md
 !CHANGELOG.md
 
+# Tree Mapper output
+.tree/**
+
 #Private files of developer
-.private/
+.private/**

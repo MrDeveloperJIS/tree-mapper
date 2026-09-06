@@ -47,13 +47,14 @@ Before generating, Tree Mapper opens a full-screen webview panel with every file
 | **Restore last** | Re-apply the selection from your previous run *(appears when a saved selection exists)* |
 | **Select filtered** | Check only the files currently visible in the search filter |
 | **Deselect filtered** | Uncheck only the files currently visible in the search filter |
-| **Filter** | Type to narrow the tree by filename or path |
+| **Filter** | Type to narrow the tree by filename or path. Matching folders and files keep their checkbox; parent folders shown only to give a match context (not matched themselves) are still visible but their checkbox is hidden |
 
 **Other picker features:**
 
 - **Indentation connector lines** — vertical guide lines between nesting levels for clear hierarchy
 - **Auto-collapsed excluded dirs** — folders whose entire contents are excluded by default patterns start collapsed, reducing noise in large repos
 - **Live file count** — the footer updates in real time as you check and uncheck files
+- **Fast on large workspaces** — checkbox lookups and bulk selection changes (Select all, Select/Deselect filtered, Reset defaults, Restore last) are O(1)/O(n), so the picker stays responsive even on workspaces with thousands of files
 
 The picker remembers your last selection per workspace root in `.tree/last-selection.json` and restores it automatically on next open.
 

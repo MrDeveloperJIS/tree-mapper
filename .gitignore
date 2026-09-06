@@ -1,5 +1,5 @@
-node_modules/
-*.vsix
-*.log
-.tree/
 # .private/
+.tree/
+node_modules/
+*.log
+*.vsix

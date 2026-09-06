@@ -4,6 +4,22 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.4.0 — 2026-09-06
+
+### Fixed
+
+- **Picker hang on large workspaces** — "Select filtered" / "Deselect filtered" (and Select all / Reset defaults / Restore last) previously looked up each checkbox with a full-DOM `querySelector` scan, then re-walked every file's ancestor folders and rescanned their whole subtree to recompute checked/indeterminate state. On workspaces with thousands of files this was effectively O(n²)–O(n³) synchronous work on the webview thread and could freeze VS Code entirely. Checkboxes are now cached by path in a `Map` for O(1) lookup, and folder states are recomputed in a single O(n) bottom-up pass over the tree instead of per-file ancestor walks.
+
+### Changed
+
+- **Filtering now shows parent folders for context** — Typing a filter keyword previously hid any folder row whose own name didn't match, even if a file inside it matched — losing the path context for that match. Ancestor folders of a match are now always shown while filtering. Folders shown purely for this context have their checkbox hidden (they aren't a real selection target); folders that are themselves a direct match keep their checkbox as before.
+
+### Internal
+
+- **Split `extension.js`** — The webview's embedded HTML/CSS/JS (the file-picker UI: tree rendering, checkbox state, filtering, selection) has been moved out of `extension.js` and into a new `pickerHtml.js`, exporting `buildPickerHtml()`. `extension.js` now contains only the actual VS Code extension logic (activation, command registration, scanning trigger, file writing, gitignore sync, snapshot pruning), bringing it back in line in size with the other source files. No functional change.
+
+---
+
 ## v2.3.0 — 2026-09-05
 
 ### Added

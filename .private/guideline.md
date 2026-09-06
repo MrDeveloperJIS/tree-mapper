@@ -50,7 +50,7 @@ code --uninstall-extension MrDeveloperJIS.tree-mapper
 ### Step 3 — Commit, tag, and push
 
 ```bash
-git add package.json
+git add .
 git commit -m "release: vx.x.x"
 git tag vx.x.x
 git push origin main --tags
