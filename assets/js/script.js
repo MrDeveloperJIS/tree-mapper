@@ -61,7 +61,7 @@ document.addEventListener('click', e => {
     }
 });
 
-/* ── Scroll reveal ── */
+/* ── Scroll reveal (sections fade up once, on entry) ── */
 const revealObs = new IntersectionObserver(entries => {
     entries.forEach(e => {
         if (e.isIntersecting) {
@@ -69,24 +69,24 @@ const revealObs = new IntersectionObserver(entries => {
             revealObs.unobserve(e.target);
         }
     });
-}, { threshold: 0.1 });
+}, { threshold: 0.12 });
 
 document.querySelectorAll('[data-reveal]').forEach(el => {
     if (el.closest('.hero')) {
-        setTimeout(() => el.classList.add('visible'), 80);
+        setTimeout(() => el.classList.add('visible'), 60);
     } else {
         revealObs.observe(el);
     }
 });
 
-/* ── Terminal typewriter ── */
+/* ── Terminal typewriter demo ── */
 const terminalLines = [
-    { type: 'cmd', text: '# Right-clicked: my-project/src' },
+    { type: 'cmd', text: '# right-clicked: my-project/src' },
     { type: 'out', text: '' },
-    { type: 'out', text: '⠸ Scanning workspace…' },
-    { type: 'out', text: '⠸ Building file picker…' },
-    { type: 'out', text: '⠸ 14 files selected' },
-    { type: 'out', text: '⠸ Rendering Markdown…' },
+    { type: 'out', text: 'scanning workspace…' },
+    { type: 'out', text: 'building file picker…' },
+    { type: 'out', text: '14 files selected' },
+    { type: 'out', text: 'rendering markdown…' },
     { type: 'out', text: '' },
     { type: 'tree', text: 'src/' },
     { type: 'tree', text: '├── <span class="file-js">extension.js</span>' },
@@ -94,8 +94,8 @@ const terminalLines = [
     { type: 'tree', text: '├── <span class="file-js">treeBuilder.js</span>' },
     { type: 'tree', text: '└── <span class="file-js">languageMap.js</span>' },
     { type: 'out', text: '' },
-    { type: 'success', text: '✓ Snapshot saved' },
-    { type: 'success', text: '→ .tree/2026-04-11-14-35-22.md' },
+    { type: 'success', text: 'snapshot saved →' },
+    { type: 'success', text: '.tree/2026-09-06-14-35-22.md' },
     { type: 'out', text: '' },
     { type: 'prompt', text: '' },
 ];
@@ -104,12 +104,13 @@ const termBody = document.getElementById('terminalBody');
 let lineIdx = 0;
 
 function typeLine() {
+    if (!termBody) return;
     if (lineIdx >= terminalLines.length) {
         setTimeout(() => {
             termBody.innerHTML = '';
             lineIdx = 0;
-            setTimeout(typeLine, 500);
-        }, 3000);
+            setTimeout(typeLine, 600);
+        }, 3200);
         return;
     }
 
@@ -131,7 +132,7 @@ function typeLine() {
 
     termBody.appendChild(div);
     termBody.scrollTop = termBody.scrollHeight;
-    setTimeout(typeLine, line.type === 'out' && line.text === '' ? 70 : 120);
+    setTimeout(typeLine, line.type === 'out' && line.text === '' ? 70 : 130);
 }
 
-setTimeout(typeLine, 800);
+if (termBody) setTimeout(typeLine, 700);
