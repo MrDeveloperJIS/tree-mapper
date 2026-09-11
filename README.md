@@ -122,7 +122,21 @@ When a `.git` folder is detected, Tree Mapper automatically adds `.tree/` to you
 |---|---|---|
 | `treemapper.maxFileSizeKB` | `2048` | Files larger than this (in KB) are excluded from snapshot contents even if checked in the picker. They appear in the `Files skipped` count. |
 | `treemapper.keepLastSnapshots` | `10` | Number of recent snapshots to retain in `.tree/`. Oldest are deleted automatically after each run. |
-| `treemapper.defaultIgnorePatterns` | `.tree/`, `node_modules/`, `.git/`, `dist/`, `build/`, `**/*.log` | Glob patterns unchecked by default in the file picker. Users can still check these individually. `.tree/` is always excluded and cannot be overridden. |
+| `treemapper.defaultIgnorePatterns` | See below | Glob patterns unchecked by default in the file picker. Users can still check these individually. `.tree/` is always excluded and cannot be overridden. |
+
+### Default ignore patterns
+
+Beyond the usual build/VCS noise (`.tree/`, `node_modules/`, `.git/`, `dist/`, `build/`, `**/*.log`), the default list also unchecks common secret and credential files, so they aren't accidentally included in a snapshot just because they exist in the workspace:
+
+- **Env files** — `.env`, `.env.*` (`.env.example` / `.env.*.example` / `.env.sample` stay checked, since these are meant to be shared)
+- **Keys & certs** — `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.crt`, `*.cer`, `*.der`, SSH keys (`id_rsa`, `id_ed25519`, `id_dsa`, `id_ecdsa` and `.pub` variants), `.ssh/`
+- **Cloud & tool credentials** — `.aws/`, `.npmrc`, `.yarnrc`, `.netrc`, `.git-credentials`, `.pgpass`, `.docker/config.json`, `.kube/`, `kubeconfig`, `gcloud/`, `*credentials*.json`, `*serviceAccount*.json`
+- **Infra state** — `*.tfstate`, `*.tfstate.backup`, `.terraform/` (Terraform state often contains plaintext secrets)
+- **Generic secrets** — `secrets.yml`, `secrets.yaml`, `secrets.json`, `*.secrets.*`, `.secret`
+- **Databases & shell history** — `*.sqlite`, `*.sqlite3`, `*.db`, `.bash_history`, `.zsh_history`, `.psql_history`, `*_history`
+- **Signing material** — `*.keystore`, `*.jks`, `*.mobileprovision`
+
+This is a convenience default, not a secrets scanner — it only unchecks files by name/extension, so anything checked manually in the picker (or a secret hardcoded inside an ordinary source file) is still included. Override the full list via the `treemapper.defaultIgnorePatterns` setting if you need different defaults.
 
 ---
 

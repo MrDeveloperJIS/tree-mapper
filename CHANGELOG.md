@@ -4,6 +4,14 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.5.0 — 2026-09-11
+
+### Added
+
+- **Secret and credential files excluded by default** — `treemapper.defaultIgnorePatterns` now unchecks common sensitive files out of the box, not just build/VCS noise. Covers env files (`.env`, `.env.*`, with `.env.example`-style files re-included), keys and certs (`*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.crt`, `*.cer`, `*.der`, SSH keys), cloud/tool credentials (`.aws/`, `.npmrc`, `.netrc`, `.git-credentials`, `.pgpass`, `.docker/config.json`, `.kube/`, `gcloud/`, generic `*credentials*.json` / `*serviceAccount*.json`), Terraform state (`*.tfstate`, `.terraform/`), generic `secrets.*` files, local databases (`*.sqlite`, `*.db`), shell history files, and signing material (`*.keystore`, `*.jks`, `*.mobileprovision`). Existing custom values for this setting are unaffected — this only changes the shipped default. See the README for the full list and rationale.
+
+---
+
 ## v2.4.0 — 2026-09-06
 
 ### Fixed
