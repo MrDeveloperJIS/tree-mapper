@@ -4,6 +4,22 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.6.0 — 2026-09-13
+
+### Fixed
+
+- **`treemapper.defaultIgnorePatterns` could silently lose most of the built-in secrets protection** — The setting held the entire ~60-pattern secrets/credentials ignore list as its schema default. VS Code's Settings UI renders and edits that list as a single scrollable array, and array-type settings are *replaced*, not merged, when saved — so editing even one entry through the graphical editor (or not realizing the list continued below the visible rows) could overwrite the setting in `settings.json` with a much shorter array, quietly disabling protection for most of the sensitive file patterns without any warning.
+
+### Changed
+
+- **The built-in ignore list is now baked into the extension itself** (`src/ignorePatterns.js`), not stored as an editable default. `treemapper.defaultIgnorePatterns` is repurposed to hold only your **own additional** patterns (new default: `[]`), which are always merged on top of the built-in list rather than replacing any part of it. See the README's [Default ignore patterns](README.md#default-ignore-patterns) section for the full built-in list and how to add your own.
+
+### Internal
+
+- Added `src/ignorePatterns.js` exporting `BUILTIN_IGNORE_PATTERNS` and `resolveIgnorePatterns(config)`. `extension.js` now calls `resolveIgnorePatterns(config)` instead of reading `treemapper.defaultIgnorePatterns` directly. No changes to `scanner.js` or `treeBuilder.js` — both already accepted a plain `string[]` regardless of its source.
+
+---
+
 ## v2.5.0 — 2026-09-11
 
 ### Added

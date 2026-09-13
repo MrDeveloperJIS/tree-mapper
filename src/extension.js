@@ -7,6 +7,7 @@ const { scanWorkspace } = require('./scanner');
 const { buildTree } = require('./treeBuilder');
 const { renderMarkdown } = require('./markdownRenderer');
 const { buildPickerHtml } = require('./pickerHtml');
+const { resolveIgnorePatterns } = require('./ignorePatterns');
 
 /** @type {vscode.StatusBarItem} */
 let statusBarItem;
@@ -40,7 +41,7 @@ function activate(context) {
     const config = vscode.workspace.getConfiguration('treemapper');
     const maxFileSizeKB = config.get('maxFileSizeKB') || 2048;
     const keepLastSnapshots = config.get('keepLastSnapshots') || 10;
-    const defaultIgnorePatterns = config.get('defaultIgnorePatterns') || [];
+    const defaultIgnorePatterns = resolveIgnorePatterns(config);
 
     // ── Step 1: Pre-scan everything (no ignore filtering) ──────────────────
     updateStatusBar('$(sync~spin) Scanning…', 'Tree Mapper: Scanning files…');

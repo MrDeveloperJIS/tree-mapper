@@ -35,7 +35,7 @@ After triggering, the **interactive file picker** opens. Confirm your selection 
 
 ## Interactive file picker
 
-Before generating, Tree Mapper opens a full-screen webview panel with every file and folder rendered as a checkbox tree. Files matching `treemapper.defaultIgnorePatterns` start unchecked and are marked with an **excluded** badge — everything else is checked by default.
+Before generating, Tree Mapper opens a full-screen webview panel with every file and folder rendered as a checkbox tree. Files matching the [built-in ignore list](#default-ignore-patterns) (defined in [`Ignore Patterns`](src/ignorePatterns.js), not a setting) — plus anything you've added via `treemapper.defaultIgnorePatterns` — start unchecked and are marked with an **excluded** badge. Everything else is checked by default.
 
 **Toolbar actions:**
 
@@ -52,7 +52,7 @@ Before generating, Tree Mapper opens a full-screen webview panel with every file
 **Other picker features:**
 
 - **Indentation connector lines** — vertical guide lines between nesting levels for clear hierarchy
-- **Auto-collapsed excluded dirs** — folders whose entire contents are excluded by default patterns start collapsed, reducing noise in large repos
+- **Auto-collapsed excluded dirs** — folders whose entire contents are excluded by the ignore list start collapsed, reducing noise in large repos
 - **Live file count** — the footer updates in real time as you check and uncheck files
 - **Fast on large workspaces** — checkbox lookups and bulk selection changes (Select all, Select/Deselect filtered, Reset defaults, Restore last) are O(1)/O(n), so the picker stays responsive even on workspaces with thousands of files
 
@@ -79,7 +79,7 @@ Links to every section present in the snapshot (`Workspace Tree`, `Snapshot Tree
 
 ### Workspace Tree
 
-Reflects the full repository structure, excluding paths matched by `treemapper.defaultIgnorePatterns`. This mirrors the Explorer sidebar regardless of what you chose to include in the snapshot.
+Reflects the full repository structure, excluding paths matched by the [built-in ignore list](#default-ignore-patterns) in `src/ignorePatterns.js` and anything added via `treemapper.defaultIgnorePatterns`. This mirrors the Explorer sidebar regardless of what you chose to include in the snapshot.
 
 ```
 my-project/
@@ -122,11 +122,11 @@ When a `.git` folder is detected, Tree Mapper automatically adds `.tree/` to you
 |---|---|---|
 | `treemapper.maxFileSizeKB` | `2048` | Files larger than this (in KB) are excluded from snapshot contents even if checked in the picker. They appear in the `Files skipped` count. |
 | `treemapper.keepLastSnapshots` | `10` | Number of recent snapshots to retain in `.tree/`. Oldest are deleted automatically after each run. |
-| `treemapper.defaultIgnorePatterns` | See below | Glob patterns unchecked by default in the file picker. Users can still check these individually. `.tree/` is always excluded and cannot be overridden. |
+| `treemapper.defaultIgnorePatterns` | `[]` | Your **own extra** glob patterns to unchecked by default in the file picker, on top of the built-in secrets/credentials list in [`ignore patterns file`](src/ignorePatterns.js) (see below). `.tree/` and the built-in list are always excluded and can't be turned off from here. |
 
 ### Default ignore patterns
 
-Beyond the usual build/VCS noise (`.tree/`, `node_modules/`, `.git/`, `dist/`, `build/`, `**/*.log`), the default list also unchecks common secret and credential files, so they aren't accidentally included in a snapshot just because they exist in the workspace:
+Beyond the usual build/VCS noise (`.tree/`, `node_modules/`, `.git/`, `dist/`, `build/`, `**/*.log`), Tree Mapper always unchecks a **built-in** list of common secret and credential files, defined in [`ignore patterns file`](src/ignorePatterns.js) as `BUILTIN_IGNORE_PATTERNS`, so they aren't accidentally included in a snapshot just because they exist in the workspace:
 
 - **Env files** — `.env`, `.env.*` (`.env.example` / `.env.*.example` / `.env.sample` stay checked, since these are meant to be shared)
 - **Keys & certs** — `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.crt`, `*.cer`, `*.der`, SSH keys (`id_rsa`, `id_ed25519`, `id_dsa`, `id_ecdsa` and `.pub` variants), `.ssh/`
@@ -136,7 +136,17 @@ Beyond the usual build/VCS noise (`.tree/`, `node_modules/`, `.git/`, `dist/`, `
 - **Databases & shell history** — `*.sqlite`, `*.sqlite3`, `*.db`, `.bash_history`, `.zsh_history`, `.psql_history`, `*_history`
 - **Signing material** — `*.keystore`, `*.jks`, `*.mobileprovision`
 
-This is a convenience default, not a secrets scanner — it only unchecks files by name/extension, so anything checked manually in the picker (or a secret hardcoded inside an ordinary source file) is still included. Override the full list via the `treemapper.defaultIgnorePatterns` setting if you need different defaults.
+This is a convenience default, not a secrets scanner — it only unchecks files by name/extension, so anything checked manually in the picker (or a secret hardcoded inside an ordinary source file) is still included.
+
+This list lives in **`src/ignorePatterns.js`**, baked into the extension's code — not a setting you can edit or shrink. As of v2.6.0 it's no longer stored as an overridable array in `treemapper.defaultIgnorePatterns`, since a plain array-of-strings setting like that is always *replaced* rather than merged by VS Code, and the list had grown long enough that partially editing it in the Settings UI could silently drop most of the protection without anyone noticing.
+
+`extension.js` merges the two via `resolveIgnorePatterns(config)`, exported from `src/ignorePatterns.js` — your setting is always concatenated on top of `BUILTIN_IGNORE_PATTERNS`, never replacing it.
+
+If you want to unchecked additional files of your own — on top of, never instead of, the list in `src/ignorePatterns.js` — add them to `treemapper.defaultIgnorePatterns`:
+
+```json
+"treemapper.defaultIgnorePatterns": ["*.local.json", "scratch/"]
+```
 
 ---
 
