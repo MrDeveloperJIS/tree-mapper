@@ -93,7 +93,59 @@ const BUILTIN_IGNORE_PATTERNS = Object.freeze([
  */
 function resolveIgnorePatterns(config) {
   const userPatterns = config.get('defaultIgnorePatterns') || [];
-  return [...BUILTIN_IGNORE_PATTERNS, ...userPatterns];
+  return dedupePatterns([...BUILTIN_IGNORE_PATTERNS, ...userPatterns]);
 }
 
-module.exports = { BUILTIN_IGNORE_PATTERNS, resolveIgnorePatterns };
+/**
+ * Removes duplicate (and blank) patterns. Keeps the LAST occurrence of each,
+ * because in .gitignore semantics the last matching pattern wins — dropping an
+ * earlier identical copy can never change the result.
+ *
+ * @param {string[]} patterns
+ * @returns {string[]}
+ */
+function dedupePatterns(patterns) {
+  const seen = new Set();
+  const out = [];
+  for (let i = patterns.length - 1; i >= 0; i--) {
+    const p = typeof patterns[i] === 'string' ? patterns[i].trim() : '';
+    if (!p || seen.has(p)) continue;
+    seen.add(p);
+    out.push(p);
+  }
+  return out.reverse();
+}
+
+/**
+ * Cleans the user's saved `defaultIgnorePatterns` (User and Workspace scopes):
+ * drops entries that duplicate the built-in list or each other, and writes the
+ * result back only if something actually changed.
+ *
+ * @param {import('vscode')} vscode
+ */
+async function cleanUserPatterns(vscode) {
+  const config = vscode.workspace.getConfiguration('treemapper');
+  const info = config.inspect('defaultIgnorePatterns');
+  if (!info) return;
+  const builtin = new Set(BUILTIN_IGNORE_PATTERNS);
+  const scopes = [
+    [info.globalValue, vscode.ConfigurationTarget.Global],
+    [info.workspaceValue, vscode.ConfigurationTarget.Workspace],
+  ];
+  for (const [value, target] of scopes) {
+    if (!Array.isArray(value)) continue;
+    const cleaned = dedupePatterns(value).filter((p) => !builtin.has(p));
+    if (cleaned.length === value.length) continue;
+    try {
+      await config.update(
+        'defaultIgnorePatterns',
+        cleaned.length ? cleaned : undefined,
+        target
+      );
+    } catch (_) {
+      /* read-only or unavailable scope — ignore, runtime dedupe still applies */
+    }
+  }
+}
+
+module.exports = { BUILTIN_IGNORE_PATTERNS, resolveIgnorePatterns, dedupePatterns, cleanUserPatterns };

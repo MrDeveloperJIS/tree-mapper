@@ -7,12 +7,15 @@ const { scanWorkspace } = require('./scanner');
 const { buildTree } = require('./treeBuilder');
 const { renderMarkdown } = require('./markdownRenderer');
 const { buildPickerHtml } = require('./pickerHtml');
-const { resolveIgnorePatterns } = require('./ignorePatterns');
+const { resolveIgnorePatterns, cleanUserPatterns } = require('./ignorePatterns');
 
 /** @type {vscode.StatusBarItem} */
 let statusBarItem;
 
 function activate(context) {
+  // Keep the saved user setting free of duplicates / built-in entries
+  cleanUserPatterns(vscode);
+
   // ── Status bar ──────────────────────────────────────────────────────────────
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBarItem.name = 'Tree Mapper';

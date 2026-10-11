@@ -4,6 +4,26 @@ All notable changes to Tree Mapper are documented here.
 
 ---
 
+## v2.6.1 — 2026-10-11
+
+### Fixed
+
+- **Stale ignore list kept showing after upgrading from v2.5.x or earlier** — Before v2.6.0 the full ignore list was the setting's default, and editing it in the Settings UI (or clicking **Add Item**) saved a copy of that list into your `settings.json`. That saved copy overrides the new `[]` default and survives uninstalling and reinstalling the extension, so `treemapper.defaultIgnorePatterns` kept showing the old list. The extension now cleans this up automatically (see below).
+
+### Added
+
+- **Automatic cleanup of saved patterns** — When the extension activates (the first time you run a Tree Mapper command after starting VS Code), it checks `treemapper.defaultIgnorePatterns` in both User and Workspace settings and removes entries that duplicate the built-in list or each other. The setting is rewritten only if something actually changed, and is removed entirely if nothing custom remains. Your own extra patterns (e.g. `.draw.io`, `.private`) are kept.
+
+### Changed
+
+- **Duplicate patterns are removed at runtime** — `resolveIgnorePatterns(config)` now de-duplicates the merged built-in + user list and drops blank entries. The last copy of each pattern is kept, since the last matching rule wins in `.gitignore` semantics, so removing earlier copies never changes what gets ignored.
+
+### Internal
+
+- `src/ignorePatterns.js` now also exports `dedupePatterns(patterns)` and `cleanUserPatterns(vscode)`. `extension.js` calls `cleanUserPatterns(vscode)` once at the start of `activate()`. No changes to `scanner.js`, `treeBuilder.js` or `pickerHtml.js`.
+
+---
+
 ## v2.6.0 — 2026-09-13
 
 ### Fixed

@@ -1,4 +1,4 @@
-## 🌲 Tree Mapper v2.6.0
+## 🌲 Tree Mapper v2.6.1
 
 Tree Mapper generates rich Markdown snapshots of your workspace directly from VS Code. Select exactly which files to include via an interactive file picker, and get a structured snapshot with a full project tree, language-aware code blocks, token count estimates, and more — saved to `.tree/` and ready to paste into any LLM context.
 
@@ -15,22 +15,28 @@ Tree Mapper generates rich Markdown snapshots of your workspace directly from VS
 
 ---
 
-### What's new in v2.6.0
+### What's new in v2.6.1
 
 ### Fixed
 
-- **`treemapper.defaultIgnorePatterns` could silently lose most of its secrets protection** — the ~60-pattern secrets/credentials ignore list added in v2.5.0 lived entirely in this one setting's default value. Because VS Code array settings are *replaced*, not merged, editing that setting through the graphical Settings UI (or missing that the list continued below the visible rows) could overwrite it with a much shorter list — quietly turning off protection for most sensitive file patterns with no warning.
+- **Old ignore list kept showing in Settings after upgrading** — before v2.6.0, the full ignore list was the default of `treemapper.defaultIgnorePatterns`, so editing it in the Settings UI (or clicking **Add Item**) saved a copy into your `settings.json`. That saved copy overrides the new `[]` default and survives uninstalling the extension. Tree Mapper now cleans it up automatically the first time it runs after updating.
+
+### Added
+
+- **Automatic cleanup of saved patterns** — when the extension activates (first command run in a session), entries in `treemapper.defaultIgnorePatterns` (User and Workspace) that duplicate the built-in list or each other are removed. The setting is rewritten only if something changed, and your own extra patterns are kept.
 
 ### Changed
 
-- **Built-in ignore list is now baked into the extension**, in a new `src/ignorePatterns.js` file (`BUILTIN_IGNORE_PATTERNS`), not stored as an editable setting default. `treemapper.defaultIgnorePatterns` now holds only your **own extra** patterns (default: `[]`) and is merged on top of the built-in list via `resolveIgnorePatterns(config)`, never replacing it. See the [README](https://github.com/MrDeveloperJIS/tree-mapper#default-ignore-patterns) for the full built-in list.
+- **Duplicate patterns are removed at runtime** — the merged built-in + user list is de-duplicated before scanning (last copy kept, so `.gitignore` last-match-wins behaviour is unchanged).
+
+If you still see an old list after updating, run **Tree Mapper: Generate Snapshot** once, or use the gear icon → **Reset Setting**. See the [README](https://github.com/MrDeveloperJIS/tree-mapper#default-ignore-patterns) for details.
 
 ---
 
 ### 📦 Installation
 
 **Via VSIX (this page):**
-1. Download `tree-mapper-2.6.0.vsix` below
+1. Download `tree-mapper-2.6.1.vsix` below
 2. Extensions panel (`Ctrl+Shift+X`) → **⋯ menu** → **Install from VSIX…**
 3. Select the file and reload VS Code
 

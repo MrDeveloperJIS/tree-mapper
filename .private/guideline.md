@@ -11,7 +11,7 @@ How to build and publish a new version to GitHub Releases.
 In `package.json`, update the version number:
 
 ```json
-"version": "1.2.0"
+"version": "2.6.1"
 ```
 
 | Change type | When to use |
@@ -19,6 +19,12 @@ In `package.json`, update the version number:
 | `patch` — `2.2.0 → 2.2.1` | Bug fixes |
 | `minor` — `2.2.0 → 2.3.0` | New features |
 | `major` — `2.2.0 → 3.0.0` | Breaking changes |
+
+Also update these files to match the new version:
+
+- `CHANGELOG.md` — add a new entry at the top
+- `README.md` — if settings or behaviour changed
+- `.private/release-note-github.md` — rewrite "What's new" for this release and update the version in the title and `.vsix` name
 
 ---
 
@@ -70,21 +76,3 @@ git push origin main --tags
 6. Click **Publish release**
 
 ---
-
-## Release Notes Template
-
-```markdown
-## What's New
-- 
-
-## Installation
-1. Download `tree-mapper-x.x.x.vsix` below
-2. In VS Code: Extensions panel → `⋯` menu → **Install from VSIX…**
-   — or run: `code --install-extension path/to/tree-mapper-x.x.x.vsix`
-
-## Requirements
-- VS Code 1.85.0 or higher
-
-## Current Version
-`2.2.0` — bump from here for the next release.
-```

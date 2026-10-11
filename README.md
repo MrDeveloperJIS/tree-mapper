@@ -122,7 +122,7 @@ When a `.git` folder is detected, Tree Mapper automatically adds `.tree/` to you
 |---|---|---|
 | `treemapper.maxFileSizeKB` | `2048` | Files larger than this (in KB) are excluded from snapshot contents even if checked in the picker. They appear in the `Files skipped` count. |
 | `treemapper.keepLastSnapshots` | `10` | Number of recent snapshots to retain in `.tree/`. Oldest are deleted automatically after each run. |
-| `treemapper.defaultIgnorePatterns` | `[]` | Your **own extra** glob patterns to unchecked by default in the file picker, on top of the built-in secrets/credentials list in [`ignore patterns file`](src/ignorePatterns.js) (see below). `.tree/` and the built-in list are always excluded and can't be turned off from here. |
+| `treemapper.defaultIgnorePatterns` | `[]` | Your **own extra** glob patterns to unchecked by default in the file picker, on top of the built-in secrets/credentials list in [`ignore patterns file`](src/ignorePatterns.js) (see below). `.tree/` and the built-in list are always excluded and can't be turned off from here. Duplicates and entries already in the built-in list are removed automatically. |
 
 ### Default ignore patterns
 
@@ -147,6 +147,10 @@ If you want to unchecked additional files of your own — on top of, never inste
 ```json
 "treemapper.defaultIgnorePatterns": ["*.local.json", "scratch/"]
 ```
+
+**Duplicates are cleaned automatically.** Entries that repeat the built-in list (or each other) have no effect, so Tree Mapper strips them: at runtime the merged list is de-duplicated, and when the extension activates (the first time you run **Tree Mapper: Generate Snapshot** in a VS Code session) your saved `treemapper.defaultIgnorePatterns` (User and Workspace) is rewritten without them if needed. Only your genuinely extra patterns remain.
+
+**Still seeing an old list in Settings?** Before v2.6.0 the full list was the setting's default, so editing it in the Settings UI saved a copy into your `settings.json`. That copy survives uninstalling the extension. The cleanup above removes it the first time you run Tree Mapper after updating; you can also use the gear icon → **Reset Setting**, or delete the `treemapper.defaultIgnorePatterns` entry from `settings.json` yourself.
 
 ---
 
