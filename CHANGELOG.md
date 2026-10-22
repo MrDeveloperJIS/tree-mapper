@@ -2,6 +2,33 @@
 
 All notable changes to Tree Mapper are documented here.
 
+## v2.7.0 — 2026-10-22
+
+### Added
+
+- **Structure-only snapshot** — Generate with no files selected to get just the project tree (no index, contents or stats). The picker button changes to "Generate Structure Only", and an empty selection no longer overwrites your saved last selection.
+- **Workspace folder picker** — In multi-root workspaces, running the command from the Command Palette or status bar now asks which folder to snapshot.
+
+### Fixed
+
+- **Files containing code fences broke the snapshot** — each file is now wrapped in a fence one backtick longer than the longest run of three or more backticks inside it (minimum three), so READMEs and other Markdown files no longer close the block early.
+- **Picker script injection** — file names containing `</script>` can no longer break out of the embedded JSON. The picker also now has a Content-Security-Policy.
+- **Non-ASCII file names** — anchor links now follow GitHub's Unicode-aware slug rules.
+
+### Changed
+
+- **Ignore patterns are now documented in their own page** — The README and the `treemapper.defaultIgnorePatterns` setting description no longer point you to `src/ignorePatterns.js`. They link to a new [built-in ignore patterns](docs/IGNORE_PATTERNS.md) page that groups every pattern by category and explains how to add your own. The long duplicated list was removed from the README.
+- **Faster scanning** — `node_modules/`, `.git/` and `.tree/` are pruned during the glob and no longer appear in the picker.
+- **No network access from the picker** — Google Fonts removed. The picker uses your VS Code fonts.
+
+### Internal
+
+- Added `docs/IGNORE_PATTERNS.md` and a test (`test/ignore-patterns-sync.test.js`) that fails if any pattern in `BUILTIN_IGNORE_PATTERNS` is missing from that page.
+- The `treemapper.defaultIgnorePatterns` setting now uses `markdownDescription` so the link in Settings is clickable.
+- Added unit tests (`npm test`) and an ESLint config; `npm run lint` now works and reports no warnings.
+- Removed the stale `.treeignore` language mapping.
+- `buildTree(files, defaultIgnorePatterns, allEntries)` no longer takes the unused `excludedSet` argument, and `buildNestedTree` no longer takes an unused `rootPath`.
+
 ---
 
 ## v2.6.1 — 2026-10-11

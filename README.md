@@ -13,6 +13,7 @@ Right-click any folder in VS Code's Explorer → **Tree Mapper: Generate Snapsho
 - A **Snapshot Tree** — the same tree format, scoped to only the files you chose to include
 - Every included file's source code in **language-aware fenced blocks** (60+ languages), each followed by a **Back to top** link
 - A **snapshot header** with timestamp, file counts, total repo size, and estimated token count
+- Or, if you select no files, a lightweight **structure-only** snapshot containing just the project tree
 
 Snapshots are saved to `.tree/yyyy-mm-dd-hh-mm-ss.md` inside the `.tree` folder.
 
@@ -31,11 +32,15 @@ Click the **Tree Mapper** item in the bottom-right status bar — it shows live 
 
 After triggering, the **interactive file picker** opens. Confirm your selection and a snapshot is generated. A notification appears with an **Open File** button.
 
+In a **multi-root workspace**, running the command from the Command Palette or status bar asks which workspace folder to snapshot. Right-clicking a folder in the Explorer always uses that folder.
+
 ---
 
 ## Interactive file picker
 
-Before generating, Tree Mapper opens a full-screen webview panel with every file and folder rendered as a checkbox tree. Files matching the [built-in ignore list](#default-ignore-patterns) (defined in [`Ignore Patterns`](src/ignorePatterns.js), not a setting) — plus anything you've added via `treemapper.defaultIgnorePatterns` — start unchecked and are marked with an **excluded** badge. Everything else is checked by default.
+Before generating, Tree Mapper opens a full-screen webview panel with every file and folder rendered as a checkbox tree. Files matching the [built-in ignore list](#default-ignore-patterns) (see [built-in ignore patterns](docs/IGNORE_PATTERNS.md)) — plus anything you've added via `treemapper.defaultIgnorePatterns` — start unchecked and are marked with an **excluded** badge. Everything else is checked by default. `node_modules/`, `.git/` and `.tree/` are skipped during the scan itself, so they never appear in the picker and large repos open quickly.
+
+The picker is fully offline: it loads no fonts or other network resources, uses your VS Code fonts, and runs under a strict Content-Security-Policy.
 
 **Toolbar actions:**
 
@@ -54,6 +59,7 @@ Before generating, Tree Mapper opens a full-screen webview panel with every file
 - **Indentation connector lines** — vertical guide lines between nesting levels for clear hierarchy
 - **Auto-collapsed excluded dirs** — folders whose entire contents are excluded by the ignore list start collapsed, reducing noise in large repos
 - **Live file count** — the footer updates in real time as you check and uncheck files
+- **Structure-only mode** — uncheck everything (or use **Deselect all**) and the button changes to **Generate Structure Only**
 - **Fast on large workspaces** — checkbox lookups and bulk selection changes (Select all, Select/Deselect filtered, Reset defaults, Restore last) are O(1)/O(n), so the picker stays responsive even on workspaces with thousands of files
 
 The picker remembers your last selection per workspace root in `.tree/last-selection.json` and restores it automatically on next open.
@@ -62,16 +68,14 @@ The picker remembers your last selection per workspace root in `.tree/last-selec
 
 ## Output format
 
-```
-> **Generated:** 2026 04 28 06:50:41 PM UTC+6
-> **Files included:** 12
-> **Files skipped:** 1
-> **Files excluded:** 345
-> **Repo size:** 75.57 KB
-> **Est. token count:** ~18,676 tokens
-```
+> **Generated:** 2026 04 28 06:50:41 PM UTC+6  
+> **Files included:** 12  
+> **Files skipped:** 1  
+> **Files excluded:** 345  
+> **Repo size:** 75.57 KB  
+> **Est. token count:** ~18,676 tokens 
 
-Followed by five sections, in this order: `Index`, `Workspace Tree`, `Snapshot Tree`, `Skipped Files` (when applicable), and `File Contents`.
+Followed by the sections below, in this order: `Index`, `Workspace Tree`, `Snapshot Tree`, `Skipped Files` (when applicable), and `File Contents`.
 
 ### Index
 
@@ -79,7 +83,7 @@ Links to every section present in the snapshot (`Workspace Tree`, `Snapshot Tree
 
 ### Workspace Tree
 
-Reflects the full repository structure, excluding paths matched by the [built-in ignore list](#default-ignore-patterns) in `src/ignorePatterns.js` and anything added via `treemapper.defaultIgnorePatterns`. This mirrors the Explorer sidebar regardless of what you chose to include in the snapshot.
+Reflects the full repository structure, excluding paths matched by the [built-in ignore list](docs/IGNORE_PATTERNS.md) and anything added via `treemapper.defaultIgnorePatterns`. This mirrors the Explorer sidebar regardless of what you chose to include in the snapshot.
 
 ```
 my-project/
@@ -102,7 +106,15 @@ If a file was selected in the picker but couldn't be read (binary content, or si
 
 Right after the `## File Contents` heading, a clickable list of every included file links to that file's section further down — useful for jumping straight to a specific file in a snapshot with many of them, without scrolling through the tree. Each file's code block is followed by a **Back to top** link that returns you to this list.
 
-All links are plain markdown heading anchors (no HTML), generated and de-duplicated the same way GitHub and VS Code's Markdown preview do, so they work in any standard Markdown viewer.
+All links are plain markdown heading anchors (no HTML), generated and de-duplicated the same way GitHub and VS Code's Markdown preview do — including non-English file names, whose letters are kept — so they work in any standard Markdown viewer.
+
+### Structure-only snapshot
+
+If you generate with **no files selected**, the snapshot contains only a `# Project Structure` title and the project tree (the same tree as the Workspace Tree, excluding default-ignored paths) — no header stats, index, or file contents. An empty selection is not saved as your "last selection", so **Restore last** still brings back your previous real selection.
+
+### Code fences
+
+Each file's source is wrapped in a fenced code block. If a file itself contains fences (every README, for example), the snapshot uses a longer fence — one backtick more than the longest run of backticks in that file — so the contents can never close the block early.
 
 ### Token estimate
 
@@ -122,35 +134,17 @@ When a `.git` folder is detected, Tree Mapper automatically adds `.tree/` to you
 |---|---|---|
 | `treemapper.maxFileSizeKB` | `2048` | Files larger than this (in KB) are excluded from snapshot contents even if checked in the picker. They appear in the `Files skipped` count. |
 | `treemapper.keepLastSnapshots` | `10` | Number of recent snapshots to retain in `.tree/`. Oldest are deleted automatically after each run. |
-| `treemapper.defaultIgnorePatterns` | `[]` | Your **own extra** glob patterns to unchecked by default in the file picker, on top of the built-in secrets/credentials list in [`ignore patterns file`](src/ignorePatterns.js) (see below). `.tree/` and the built-in list are always excluded and can't be turned off from here. Duplicates and entries already in the built-in list are removed automatically. |
+| `treemapper.defaultIgnorePatterns` | `[]` | Your **own extra** glob patterns to uncheck by default in the file picker, on top of the built-in secrets/credentials list in [built-in list](docs/IGNORE_PATTERNS.md). `.tree/` and the built-in list are always excluded and can't be turned off from here. Duplicates and entries already in the built-in list are removed automatically. |
 
 ### Default ignore patterns
 
-Beyond the usual build/VCS noise (`.tree/`, `node_modules/`, `.git/`, `dist/`, `build/`, `**/*.log`), Tree Mapper always unchecks a **built-in** list of common secret and credential files, defined in [`ignore patterns file`](src/ignorePatterns.js) as `BUILTIN_IGNORE_PATTERNS`, so they aren't accidentally included in a snapshot just because they exist in the workspace:
+Tree Mapper always unchecks a built-in list of build/VCS noise and common secret and credential files (`.env`, private keys, cloud credentials, Terraform state and more). See the [full list of built-in ignore patterns](docs/IGNORE_PATTERNS.md).
 
-- **Env files** — `.env`, `.env.*` (`.env.example` / `.env.*.example` / `.env.sample` stay checked, since these are meant to be shared)
-- **Keys & certs** — `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.crt`, `*.cer`, `*.der`, SSH keys (`id_rsa`, `id_ed25519`, `id_dsa`, `id_ecdsa` and `.pub` variants), `.ssh/`
-- **Cloud & tool credentials** — `.aws/`, `.npmrc`, `.yarnrc`, `.netrc`, `.git-credentials`, `.pgpass`, `.docker/config.json`, `.kube/`, `kubeconfig`, `gcloud/`, `*credentials*.json`, `*serviceAccount*.json`
-- **Infra state** — `*.tfstate`, `*.tfstate.backup`, `.terraform/` (Terraform state often contains plaintext secrets)
-- **Generic secrets** — `secrets.yml`, `secrets.yaml`, `secrets.json`, `*.secrets.*`, `.secret`
-- **Databases & shell history** — `*.sqlite`, `*.sqlite3`, `*.db`, `.bash_history`, `.zsh_history`, `.psql_history`, `*_history`
-- **Signing material** — `*.keystore`, `*.jks`, `*.mobileprovision`
-
-This is a convenience default, not a secrets scanner — it only unchecks files by name/extension, so anything checked manually in the picker (or a secret hardcoded inside an ordinary source file) is still included.
-
-This list lives in **`src/ignorePatterns.js`**, baked into the extension's code — not a setting you can edit or shrink. As of v2.6.0 it's no longer stored as an overridable array in `treemapper.defaultIgnorePatterns`, since a plain array-of-strings setting like that is always *replaced* rather than merged by VS Code, and the list had grown long enough that partially editing it in the Settings UI could silently drop most of the protection without anyone noticing.
-
-`extension.js` merges the two via `resolveIgnorePatterns(config)`, exported from `src/ignorePatterns.js` — your setting is always concatenated on top of `BUILTIN_IGNORE_PATTERNS`, never replacing it.
-
-If you want to unchecked additional files of your own — on top of, never instead of, the list in `src/ignorePatterns.js` — add them to `treemapper.defaultIgnorePatterns`:
+To add your own, use `treemapper.defaultIgnorePatterns`. Your patterns are always merged on top of the built-in list, never in place of it:
 
 ```json
-"treemapper.defaultIgnorePatterns": ["*.local.json", "scratch/"]
+"treemapper.defaultIgnorePatterns": ["*.local.json", ".private/"]
 ```
-
-**Duplicates are cleaned automatically.** Entries that repeat the built-in list (or each other) have no effect, so Tree Mapper strips them: at runtime the merged list is de-duplicated, and when the extension activates (the first time you run **Tree Mapper: Generate Snapshot** in a VS Code session) your saved `treemapper.defaultIgnorePatterns` (User and Workspace) is rewritten without them if needed. Only your genuinely extra patterns remain.
-
-**Still seeing an old list in Settings?** Before v2.6.0 the full list was the setting's default, so editing it in the Settings UI saved a copy into your `settings.json`. That copy survives uninstalling the extension. The cleanup above removes it the first time you run Tree Mapper after updating; you can also use the gear icon → **Reset Setting**, or delete the `treemapper.defaultIgnorePatterns` entry from `settings.json` yourself.
 
 ---
 
@@ -176,6 +170,18 @@ Download from the [Releases page](https://github.com/MrDeveloperJIS/tree-mapper/
 ## Requirements
 
 VS Code **1.85.0** or higher.
+
+---
+
+## Development
+
+```
+npm install
+npm test        # unit tests (node:test)
+npm run lint    # ESLint
+```
+
+Press **F5** in VS Code to launch an Extension Development Host.
 
 ---
 

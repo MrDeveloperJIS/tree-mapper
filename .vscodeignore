@@ -20,3 +20,7 @@
 
 #Private files of developer
 .private/**
+
+# Dev-only
+test/**
+eslint.config.js

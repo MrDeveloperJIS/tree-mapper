@@ -18,65 +18,65 @@
  * below always concatenates with this list rather than replacing it.
  */
 const BUILTIN_IGNORE_PATTERNS = Object.freeze([
-  '.tree/',
-  'node_modules/',
-  '.git/',
-  'dist/',
-  'build/',
-  '**/*.log',
-  '.env',
-  '.env.*',
-  '!.env.example',
-  '!.env.*.example',
-  '!.env.sample',
-  '*.pem',
-  '*.key',
-  '*.p12',
-  '*.pfx',
-  '*.crt',
-  '*.cer',
-  '*.der',
-  'id_rsa',
-  'id_rsa.pub',
-  'id_ed25519',
-  'id_ed25519.pub',
-  'id_dsa',
-  'id_ecdsa',
-  '.ssh/',
-  '.pgpass',
-  '.npmrc',
-  '.yarnrc',
-  '.netrc',
-  '.git-credentials',
-  '.aws/',
-  'credentials.json',
-  '*credentials*.json',
-  '*serviceAccount*.json',
-  '*service-account*.json',
-  'gcloud/',
-  '.gcloud/',
-  '.kube/',
-  'kubeconfig',
-  '*.kubeconfig',
-  '.docker/config.json',
-  '*.tfstate',
-  '*.tfstate.backup',
-  '.terraform/',
-  'secrets.yml',
-  'secrets.yaml',
-  'secrets.json',
-  '*.secrets.*',
-  '.secret',
-  '*.sqlite',
-  '*.sqlite3',
-  '*.db',
-  '*_history',
-  '.bash_history',
-  '.zsh_history',
-  '.psql_history',
-  '*.keystore',
-  '*.jks',
-  '*.mobileprovision',
+    '.tree/',
+    'node_modules/',
+    '.git/',
+    'dist/',
+    'build/',
+    '**/*.log',
+    '.env',
+    '.env.*',
+    '!.env.example',
+    '!.env.*.example',
+    '!.env.sample',
+    '*.pem',
+    '*.key',
+    '*.p12',
+    '*.pfx',
+    '*.crt',
+    '*.cer',
+    '*.der',
+    'id_rsa',
+    'id_rsa.pub',
+    'id_ed25519',
+    'id_ed25519.pub',
+    'id_dsa',
+    'id_ecdsa',
+    '.ssh/',
+    '.pgpass',
+    '.npmrc',
+    '.yarnrc',
+    '.netrc',
+    '.git-credentials',
+    '.aws/',
+    'credentials.json',
+    '*credentials*.json',
+    '*serviceAccount*.json',
+    '*service-account*.json',
+    'gcloud/',
+    '.gcloud/',
+    '.kube/',
+    'kubeconfig',
+    '*.kubeconfig',
+    '.docker/config.json',
+    '*.tfstate',
+    '*.tfstate.backup',
+    '.terraform/',
+    'secrets.yml',
+    'secrets.yaml',
+    'secrets.json',
+    '*.secrets.*',
+    '.secret',
+    '*.sqlite',
+    '*.sqlite3',
+    '*.db',
+    '*_history',
+    '.bash_history',
+    '.zsh_history',
+    '.psql_history',
+    '*.keystore',
+    '*.jks',
+    '*.mobileprovision',
 ]);
 
 /**
@@ -92,8 +92,8 @@ const BUILTIN_IGNORE_PATTERNS = Object.freeze([
  * @returns {string[]}
  */
 function resolveIgnorePatterns(config) {
-  const userPatterns = config.get('defaultIgnorePatterns') || [];
-  return dedupePatterns([...BUILTIN_IGNORE_PATTERNS, ...userPatterns]);
+    const userPatterns = config.get('defaultIgnorePatterns') || [];
+    return dedupePatterns([...BUILTIN_IGNORE_PATTERNS, ...userPatterns]);
 }
 
 /**
@@ -105,15 +105,15 @@ function resolveIgnorePatterns(config) {
  * @returns {string[]}
  */
 function dedupePatterns(patterns) {
-  const seen = new Set();
-  const out = [];
-  for (let i = patterns.length - 1; i >= 0; i--) {
-    const p = typeof patterns[i] === 'string' ? patterns[i].trim() : '';
-    if (!p || seen.has(p)) continue;
-    seen.add(p);
-    out.push(p);
-  }
-  return out.reverse();
+    const seen = new Set();
+    const out = [];
+    for (let i = patterns.length - 1; i >= 0; i--) {
+        const p = typeof patterns[i] === 'string' ? patterns[i].trim() : '';
+        if (!p || seen.has(p)) continue;
+        seen.add(p);
+        out.push(p);
+    }
+    return out.reverse();
 }
 
 /**
@@ -124,28 +124,28 @@ function dedupePatterns(patterns) {
  * @param {import('vscode')} vscode
  */
 async function cleanUserPatterns(vscode) {
-  const config = vscode.workspace.getConfiguration('treemapper');
-  const info = config.inspect('defaultIgnorePatterns');
-  if (!info) return;
-  const builtin = new Set(BUILTIN_IGNORE_PATTERNS);
-  const scopes = [
-    [info.globalValue, vscode.ConfigurationTarget.Global],
-    [info.workspaceValue, vscode.ConfigurationTarget.Workspace],
-  ];
-  for (const [value, target] of scopes) {
-    if (!Array.isArray(value)) continue;
-    const cleaned = dedupePatterns(value).filter((p) => !builtin.has(p));
-    if (cleaned.length === value.length) continue;
-    try {
-      await config.update(
-        'defaultIgnorePatterns',
-        cleaned.length ? cleaned : undefined,
-        target
-      );
-    } catch (_) {
-      /* read-only or unavailable scope — ignore, runtime dedupe still applies */
+    const config = vscode.workspace.getConfiguration('treemapper');
+    const info = config.inspect('defaultIgnorePatterns');
+    if (!info) return;
+    const builtin = new Set(BUILTIN_IGNORE_PATTERNS);
+    const scopes = [
+        [info.globalValue, vscode.ConfigurationTarget.Global],
+        [info.workspaceValue, vscode.ConfigurationTarget.Workspace],
+    ];
+    for (const [value, target] of scopes) {
+        if (!Array.isArray(value)) continue;
+        const cleaned = dedupePatterns(value).filter((p) => !builtin.has(p));
+        if (cleaned.length === value.length) continue;
+        try {
+            await config.update(
+                'defaultIgnorePatterns',
+                cleaned.length ? cleaned : undefined,
+                target
+            );
+        } catch (_) {
+            /* read-only or unavailable scope — ignore, runtime dedupe still applies */
+        }
     }
-  }
 }
 
 module.exports = { BUILTIN_IGNORE_PATTERNS, resolveIgnorePatterns, dedupePatterns, cleanUserPatterns };

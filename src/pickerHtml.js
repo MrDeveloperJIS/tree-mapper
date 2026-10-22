@@ -1,19 +1,28 @@
 'use strict';
 
+/**
+ * JSON that is safe to embed inside an inline <script>. Plain JSON.stringify
+ * does not escape "</script>" (a file could be named that), nor the U+2028 /
+ * U+2029 line separators.
+ */
+function safeJson(value) {
+    return JSON.stringify(value)
+        .replace(/</g, '\\u003c')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+}
+
 function buildPickerHtml(treeNodes, projectName, lastSelection) {
-  const treeJson = JSON.stringify(treeNodes);
-  const lastSelectionJson = JSON.stringify(lastSelection || null);
-  return /* html */`<!DOCTYPE html>
+    const treeJson = safeJson(treeNodes);
+    const lastSelectionJson = safeJson(lastSelection || null);
+    return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tree Mapper</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-
   :root {
     --bg:           #080810;
     --bg-panel:     #0c0c18;
@@ -45,8 +54,8 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 
     --amber:        #fbbf24;
 
-    --mono:         'JetBrains Mono', 'Geist Mono', monospace;
-    --sans:         'Inter', var(--vscode-font-family, system-ui, sans-serif);
+    --mono:         var(--vscode-editor-font-family, 'SF Mono', 'Cascadia Code', Consolas, monospace);
+    --sans:         var(--vscode-font-family, system-ui, -apple-system, 'Segoe UI', sans-serif);
     --radius:       8px;
     --radius-lg:    12px;
     --radius-pill:  99px;
@@ -600,7 +609,7 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 <div class="footer">
   <div class="footer-info" id="footerInfo">Loading…</div>
   <button class="btn-cancel" onclick="cancel()">Cancel</button>
-  <button class="btn-generate" id="generateBtn" onclick="generate()" disabled>Generate Snapshot</button>
+  <button class="btn-generate" id="generateBtn" onclick="generate()">Generate Snapshot</button>
 </div>
 
 <script>
@@ -970,9 +979,17 @@ function updateStats() {
   label.innerHTML = '<span class="count selected">' + selected + '</span> / <span class="count">' + total + '</span>';
   label.classList.toggle('has-selection', selected > 0);
 
-  document.getElementById('footerInfo').innerHTML =
-    '<span class="hi">' + selected + '</span> <span class="total">/ ' + total + ' files</span> selected for snapshot';
-  document.getElementById('generateBtn').disabled = selected === 0;
+  const footer = document.getElementById('footerInfo');
+  const btn = document.getElementById('generateBtn');
+  if (selected === 0) {
+    footer.innerHTML =
+      '<span class="total">No files selected — only the project structure will be generated</span>';
+    btn.textContent = 'Generate Structure Only';
+  } else {
+    footer.innerHTML =
+      '<span class="hi">' + selected + '</span> <span class="total">/ ' + total + ' files</span> selected for snapshot';
+    btn.textContent = 'Generate Snapshot';
+  }
 }
 
 // ── Generate / Cancel ────────────────────────────────────────────────────────
