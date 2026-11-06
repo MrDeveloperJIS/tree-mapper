@@ -82,7 +82,8 @@ test('scanner prunes node_modules and .git but keeps normal files', async () => 
 test('workspace tree omits default-ignored files', async () => {
     const root = makeProject({ 'src/a.js': 'x', '.env': 's' });
     const res = await scanWorkspace(root, 2048, [...BUILTIN_IGNORE_PATTERNS]);
-    const { workspaceTreeLines } = buildTree([], [...BUILTIN_IGNORE_PATTERNS], res.entries); const text = workspaceTreeLines.join('\n');
+    const { workspaceTreeLines } = buildTree([], res.entries);
+    const text = workspaceTreeLines.join('\n');
     assert.ok(text.includes('a.js'));
     assert.ok(!text.includes('.env'));
 });

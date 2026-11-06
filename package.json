@@ -2,7 +2,7 @@
     "name": "tree-mapper",
     "displayName": "Tree Mapper",
     "description": "Generate a complete Markdown snapshot of any folder in your VS Code workspace — including a full directory tree and every file's source code.",
-    "version": "2.7.0",
+    "version": "2.8.0",
     "publisher": "MrDeveloperJIS",
     "engines": {
         "vscode": "^1.85.0"
@@ -22,7 +22,9 @@
         "type": "git",
         "url": "https://github.com/MrDeveloperJIS/tree-mapper"
     },
-    "activationEvents": [],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
     "main": "./src/extension.js",
     "contributes": {
         "commands": [
@@ -53,6 +55,16 @@
                     "default": 10,
                     "minimum": 1,
                     "description": "Number of recent snapshots to keep in the .tree/ folder. Oldest are deleted automatically after each run. Default: 10."
+                },
+                "treemapper.respectGitignore": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Uncheck files matched by .gitignore (the scanned folder, its parents up to the repo root, and nested .gitignore files) in the file picker and hide them from the Workspace Tree. Built-in secret protection always stays on."
+                },
+                "treemapper.redactSecrets": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Replace detected secrets (private keys, AWS/GitHub/Slack/Stripe/Google keys, JWTs, Bearer tokens, password/token/api_key assignments) with [REDACTED] in the snapshot, even if you tick the file. Files with findings start unchecked and show a ⚠ badge in the picker."
                 },
                 "treemapper.defaultIgnorePatterns": {
                     "type": "array",

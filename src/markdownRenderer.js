@@ -3,6 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const { getLanguage } = require('./languageMap');
+const { redactText } = require('./secretScanner');
 
 function getLocalDateTimeString() {
     const now = new Date();
@@ -124,6 +125,8 @@ function renderStructureOnly(rootPath, workspaceTreeLines) {
  * @param {number}   skippedCount        - count of binary/oversized files
  * @param {number}   excludedCount       - count of user-unchecked files
  * @param {Array<{rel:string,reason:string}>} [skippedFiles] - details of each skipped file
+ * @param {{ redactSecrets?: boolean }} [options]
+ *        redactSecrets: replace detected secrets in file contents with [REDACTED]
  */
 function renderMarkdown(
     rootPath,
@@ -134,9 +137,11 @@ function renderMarkdown(
     skippedCount = 0,
     excludedCount = 0,
     skippedFiles = [],
+    options = {},
 ) {
     const projectName = path.basename(rootPath);
     const parts = [];
+    let redactedCount = 0;
 
     // Build body first (without header) so we can count tokens accurately
     const bodyParts = [];
@@ -228,7 +233,13 @@ function renderMarkdown(
         bodyParts.push('');
 
         try {
-            const content = fs.readFileSync(abs, 'utf8').trimEnd();
+            let content = fs.readFileSync(abs, 'utf8').trimEnd();
+            if (options.redactSecrets) {
+                const redacted = redactText(content);
+                content = redacted.text;
+                redactedCount += redacted.count;
+            }
+            // fenceFor + token estimate below both run on the redacted text.
             const fence = fenceFor(content);
             bodyParts.push(`${fence}${lang}`);
             bodyParts.push(content);
@@ -255,6 +266,9 @@ function renderMarkdown(
     }
     if (excludedCount > 0) {
         parts.push(`> **Files excluded:** ${excludedCount}  `);
+    }
+    if (redactedCount > 0) {
+        parts.push(`> **Secrets redacted:** ${redactedCount}  `);
     }
     parts.push(`> **Repo size:** ${formatBytes(totalSizeBytes)}  `);
     parts.push(`> **Est. token count:** ${tokenEstimate}  `);

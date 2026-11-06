@@ -4,15 +4,24 @@ const path = require('path');
 const fs = require('fs');
 const fg = require('fast-glob');
 const ignore = require('ignore');
+const { scanText } = require('./secretScanner');
 
 /**
  * Scans the workspace and returns a tree structure with ignore metadata.
- * Ignore rules come purely from the defaultIgnorePatterns setting.
+ *
+ * Ignore rules are layered, LAST MATCH WINS:
+ *   1. .gitignore files   (only when `respectGitignore` is true)
+ *   2. built-in list      (secrets, credentials, build noise)
+ *   3. user `defaultIgnorePatterns`
+ * Layers 2 + 3 always run after .gitignore, so a `!` rule in a .gitignore can
+ * never re-include a protected secret file.
  *
  * Returns:
  *   {
  *     tree: TreeNode[],       // nested tree for the webview
  *     entries: EntryMeta[],   // flat list of all entries with metadata
+ *                             // (files also carry secretCount + secretRules —
+ *                             //  rule names only, never the secret itself)
  *     total: number,          // total file count
  *     ignored: number,        // files flagged as ignoredByDefault
  *   }
@@ -44,7 +53,136 @@ function isLikelyBinary(fullPath) {
     }
 }
 
-async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatterns = []) {
+/**
+ * Looks for secrets in one text file. Returns ONLY the number of findings and
+ * the distinct rule names — the matched values are never kept or returned.
+ */
+function scanFileForSecrets(fullPath) {
+    try {
+        const findings = scanText(fs.readFileSync(fullPath, 'utf8'));
+        return { count: findings.length, rules: [...new Set(findings.map((f) => f.rule))] };
+    } catch {
+        return { count: 0, rules: [] };
+    }
+}
+
+// ── .gitignore support ────────────────────────────────────────────────────────
+
+function toPosix(p) {
+    return p.split(path.sep).join('/');
+}
+
+/** Nearest folder at or above `startDir` that contains `.git` (dir or file). */
+function findRepoRoot(startDir) {
+    let dir = path.resolve(startDir);
+    for (;;) {
+        if (fs.existsSync(path.join(dir, '.git'))) return dir;
+        const parent = path.dirname(dir);
+        if (parent === dir) return null;
+        dir = parent;
+    }
+}
+
+/** Reads one .gitignore into a matcher. Unreadable / broken file → null. */
+function readGitignore(file) {
+    try {
+        const text = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
+        return ignore().add(text);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Collects every applicable .gitignore, ordered shallow → deep (deeper files
+ * override shallower ones, like git):
+ *   - parent folders of the scanned folder, up to the repo root
+ *   - the scanned folder itself
+ *   - nested ones found inside the scanned folder
+ *
+ * Each source remembers how to turn a scanned-folder-relative path into a path
+ * relative to its OWN folder (`prepend` for parents, `strip` for nested):
+ *   { ig, strip: 'packages/app' | '', prepend: 'a/b' | '' }
+ *
+ * @param {string}   rootPath
+ * @param {string[]} relFiles  scanned-folder-relative file paths (posix)
+ */
+function collectGitignores(rootPath, relFiles) {
+    const sources = [];
+    const root = path.resolve(rootPath);
+
+    // Parents up to (and including) the repo root. No repo → none.
+    const repoRoot = findRepoRoot(root);
+    if (repoRoot && repoRoot !== root) {
+        const chain = [];
+        for (let dir = path.dirname(root); ; dir = path.dirname(dir)) {
+            chain.unshift(dir);
+            if (dir === repoRoot || path.dirname(dir) === dir) break;
+        }
+        for (const dir of chain) {
+            const ig = readGitignore(path.join(dir, '.gitignore'));
+            if (ig) sources.push({ ig, strip: '', prepend: toPosix(path.relative(dir, root)) });
+        }
+    }
+
+    // Scanned folder + nested, from the scan itself (no second filesystem walk).
+    const suffix = '/.gitignore';
+    const found = [];
+    for (const rel of relFiles) {
+        if (rel === '.gitignore') found.push('');
+        else if (rel.endsWith(suffix)) found.push(rel.slice(0, -suffix.length));
+    }
+    const depth = (dir) => (dir === '' ? 0 : dir.split('/').length);
+    found.sort((a, b) => depth(a) - depth(b));
+
+    for (const dir of found) {
+        const file = path.join(root, dir, '.gitignore');
+        const ig = readGitignore(file);
+        if (ig) sources.push({ ig, strip: dir, prepend: '' });
+    }
+
+    return sources;
+}
+
+/** Path of `rel` relative to the source's own folder, or null if out of scope. */
+function toLocalPath(src, rel) {
+    let local = rel;
+    if (src.strip) {
+        if (!rel.startsWith(src.strip + '/')) return null;
+        local = rel.slice(src.strip.length + 1);
+    }
+    if (src.prepend) local = src.prepend + '/' + local;
+    return local || null;
+}
+
+/**
+ * Verdict of all .gitignore files for one path:
+ * true = ignored, false = re-included by `!`, null = no rule matched.
+ */
+function gitignoreVerdict(sources, rel, isDir) {
+    let verdict = null;
+    for (const src of sources) {
+        const local = toLocalPath(src, rel);
+        if (!local) continue;
+        const res = src.ig.test(isDir ? local + '/' : local);
+        if (res.ignored) verdict = true;
+        else if (res.unignored) verdict = false;
+    }
+    return verdict;
+}
+
+// ── Scanner ───────────────────────────────────────────────────────────────────
+
+/**
+ * @param {string}   rootPath
+ * @param {number}   [maxFileSizeKB]
+ * @param {string[]} [defaultIgnorePatterns] built-in + user patterns
+ * @param {{ respectGitignore?: boolean }} [options]
+ */
+async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatterns = [], options = {}) {
+    const respectGitignore = options.respectGitignore !== false;
+
+    // Built-in + user patterns. Always applied AFTER .gitignore.
     const ig = ignore();
     if (defaultIgnorePatterns.length > 0) {
         ig.add(defaultIgnorePatterns);
@@ -65,6 +203,10 @@ async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatter
         suppressErrors: true,
     });
 
+    const gitignores = respectGitignore
+        ? collectGitignores(rootPath, entries.filter((r) => !r.endsWith('/')))
+        : [];
+
     const maxBytes = maxFileSizeKB * 1024;
     const entryMetas = [];
     let totalFiles = 0;
@@ -75,13 +217,20 @@ async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatter
         const isDir = rel.endsWith('/');
         const cleanRel = isDir ? rel.slice(0, -1) : rel;
 
-        // Check if ignored by default patterns
-        const ignoredByDefault = ig.ignores(isDir ? cleanRel + '/' : cleanRel)
-            || ig.ignores(cleanRel);
+        // Layer 1: .gitignore. Layers 2 + 3 (built-in, user) override it.
+        let ignoredByDefault = gitignores.length > 0
+            ? gitignoreVerdict(gitignores, cleanRel, isDir) === true
+            : false;
+
+        const own = ig.test(isDir ? cleanRel + '/' : cleanRel);
+        if (own.ignored) ignoredByDefault = true;
+        else if (own.unignored) ignoredByDefault = false;
 
         let size = 0;
         let skipped = false;
         let isBinary = false;
+        let secretCount = 0;
+        let secretRules = [];
 
         if (!isDir) {
             totalFiles++;
@@ -93,13 +242,19 @@ async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatter
 
                 if (size > maxBytes) {
                     skipped = true;
-                } else {
+                } else if (isLikelyBinary(path.join(rootPath, cleanRel))) {
                     // Binary check — only sniff the first few KB instead of reading
                     // the whole file into memory just to look for a null byte.
-                    if (isLikelyBinary(path.join(rootPath, cleanRel))) {
-                        isBinary = true;
-                        skipped = true;
-                    }
+                    isBinary = true;
+                    skipped = true;
+                } else if (!ignoredByDefault) {
+                    // Secret scan (after the binary/size check, so only text
+                    // files within the size limit are read). Default-ignored
+                    // files start unchecked anyway, so they are not read here;
+                    // redaction still applies if one is ticked.
+                    const found = scanFileForSecrets(path.join(rootPath, cleanRel));
+                    secretCount = found.count;
+                    secretRules = found.rules;
                 }
             } catch {
                 skipped = true;
@@ -113,6 +268,8 @@ async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatter
             size,
             skipped,
             isBinary,
+            secretCount,
+            secretRules,
             name: path.basename(cleanRel),
         });
     }

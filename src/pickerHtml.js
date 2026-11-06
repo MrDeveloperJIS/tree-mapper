@@ -1,5 +1,7 @@
 'use strict';
 
+const { resolvePreset } = require('./presets');
+
 /**
  * JSON that is safe to embed inside an inline <script>. Plain JSON.stringify
  * does not escape "</script>" (a file could be named that), nor the U+2028 /
@@ -12,9 +14,29 @@ function safeJson(value) {
         .replace(/\u2029/g, '\\u2029');
 }
 
-function buildPickerHtml(treeNodes, projectName, lastSelection) {
+/** Escapes text for use inside HTML element content or a quoted attribute. */
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
+ * @param {object[]} treeNodes
+ * @param {string}   projectName
+ * @param {string[]|null} lastSelection
+ * @param {{ changed: string[], staged: string[] }|null} [gitChanges]
+ *        Scanned-folder-relative paths. null → not a git repo (buttons hidden).
+ * @param {{ name: string, files: string[] }[]} [presets]  saved selections
+ */
+function buildPickerHtml(treeNodes, projectName, lastSelection, gitChanges, presets) {
     const treeJson = safeJson(treeNodes);
     const lastSelectionJson = safeJson(lastSelection || null);
+    const gitChangesJson = safeJson(gitChanges || null);
+    const presetsJson = safeJson(Array.isArray(presets) ? presets : []);
     return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -153,11 +175,39 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     font-weight: 500;
   }
   .header-hint { color: var(--fg-dim); font-size: 10.5px; }
+  .header-text { min-width: 0; }
+
+  /* Reload (rescan) button on the right side of the header */
+  .icon-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--bg-glass);
+    color: var(--fg-dim);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: color var(--t), border-color var(--t), background var(--t), transform var(--t);
+  }
+  .icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+  .icon-btn:hover:not(:disabled), .icon-btn:focus-visible {
+    color: var(--fg);
+    border-color: rgba(124,92,252,0.5);
+    background: rgba(255,255,255,0.07);
+    outline: none;
+  }
+  .icon-btn:disabled { cursor: default; opacity: 0.7; }
+  .icon-btn.spinning svg { animation: spin 0.8s linear infinite; }
 
   /* ─── Toolbar ────────────────────────────────────────────────────────── */
   .toolbar {
     position: relative;
-    z-index: 1;
+    z-index: 20;
     display: flex;
     align-items: center;
     gap: 5px;
@@ -191,6 +241,171 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     transform: translateY(-1px);
   }
   .btn-ghost:active { transform: scale(0.96) translateY(0); }
+  .btn-ghost:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+
+  /* ─── Presets: dropdown in the first row + "Manage presets" second row ── */
+  .menu-wrap { position: relative; display: inline-flex; }
+  .btn-ghost .caret { font-size: 9px; margin-left: 3px; opacity: 0.7; }
+  .btn-ghost .count-badge {
+    margin-left: 5px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-dim);
+    color: #a78bfa;
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .preset-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 40;
+    min-width: 220px;
+    max-width: min(340px, calc(100vw - 28px));
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 4px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.55);
+  }
+  .preset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding: 6px 10px;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--t);
+  }
+  .preset-item:hover, .preset-item:focus-visible { background: var(--bg-hover); outline: none; }
+  .preset-item .p-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preset-item .p-count { color: var(--fg-dim); font-size: 10.5px; flex-shrink: 0; }
+  .preset-item.manage { color: #a78bfa; }
+  .preset-menu-empty {
+    padding: 6px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+  }
+  .preset-menu-divider { height: 1px; background: var(--border); margin: 4px 2px; }
+
+  .preset-manage {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 6px;
+    margin-top: 2px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .preset-label {
+    font-size: 10.5px;
+    color: var(--fg-dim);
+    font-family: var(--mono);
+    margin-right: 2px;
+    flex-shrink: 0;
+  }
+  .preset-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .preset-empty { font-size: 11px; font-family: var(--mono); color: var(--fg-dim); }
+  .preset-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 260px;
+    padding: 2px 4px 2px 10px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg);
+  }
+  .preset-chip .c-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preset-chip .c-count { color: var(--fg-dim); font-size: 10.5px; }
+  .preset-chip.confirm { border-color: var(--danger-line); background: var(--danger-dim); }
+  .chip-btn {
+    background: transparent;
+    border: none;
+    color: var(--fg-dim);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    border-radius: var(--radius-pill);
+    padding: 1px 7px;
+    cursor: pointer;
+    transition: color var(--t), background var(--t);
+  }
+  .chip-btn:hover, .chip-btn:focus-visible { color: var(--fg); background: rgba(255,255,255,0.08); outline: none; }
+  .chip-btn.danger:hover, .chip-btn.danger:focus-visible { color: var(--danger); }
+
+  .preset-new { display: inline-flex; align-items: center; gap: 5px; }
+  .preset-name {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding: 4px 12px;
+    width: 180px;
+    outline: none;
+    color-scheme: dark;
+    transition: border-color var(--t), box-shadow var(--t);
+  }
+  .preset-name::placeholder { color: var(--fg-muted); }
+  .preset-name:focus {
+    border-color: rgba(124,92,252,0.5);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.12);
+  }
+  .preset-status {
+    font-size: 10.5px;
+    font-family: var(--mono);
+    color: var(--fg-dim);
+    margin-left: 4px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .preset-status.error { color: var(--danger); }
+  .preset-done { margin-left: auto; }
+
+  /* Short message after applying a preset (the manage row may be closed). */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 64px;
+    transform: translateX(-50%) translateY(6px);
+    z-index: 50;
+    max-width: calc(100vw - 28px);
+    padding: 6px 14px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.warn { border-color: rgba(251,191,36,0.5); color: var(--amber); }
 
   .sep {
     width: 1px;
@@ -263,26 +478,6 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     background: rgba(255,255,255,0.08);
     color: var(--fg);
   }
-
-  .stats-pill {
-    margin-left: auto;
-    font-size: 10.5px;
-    font-family: var(--mono);
-    color: var(--fg-dim);
-    white-space: nowrap;
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    padding: 3px 12px;
-    letter-spacing: 0.01em;
-    transition: border-color var(--t), box-shadow var(--t);
-  }
-  .stats-pill .count { color: var(--fg); font-weight: 500; }
-  .stats-pill.has-selection {
-    border-color: rgba(124,92,252,0.45);
-    box-shadow: 0 0 10px rgba(124,92,252,0.15);
-  }
-  .stats-pill .count.selected { color: #a78bfa; }
 
   /* ─── Tree ───────────────────────────────────────────────────────────── */
   .tree-scroll {
@@ -403,6 +598,19 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     text-transform: uppercase;
   }
 
+  .secret-chip {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--amber);
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.35);
+    border-radius: var(--radius-pill);
+    padding: 1px 6px;
+    margin-left: 8px;
+    flex-shrink: 0;
+    cursor: help;
+  }
+
   .size-tag {
     font-size: 9.5px;
     font-family: var(--mono);
@@ -521,6 +729,9 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
   @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -572,10 +783,16 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   <div class="header-text">
     <div class="header-title">Select Files for Snapshot</div>
     <div class="header-sub">
-      <span class="project-chip">${projectName}</span>
+      <span class="project-chip">${escapeHtml(projectName)}</span>
       <span class="header-hint">Excluded files are unchecked — enable them individually</span>
     </div>
   </div>
+  <button class="icon-btn" id="rescanBtn" type="button" onclick="rescanClicked()" title="Rescan project" aria-label="Rescan project">
+    <svg viewBox="0 0 16 16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/>
+      <path d="M13.5 2.5v3h-3"/>
+    </svg>
+  </button>
 </div>
 
 <!-- Toolbar -->
@@ -584,6 +801,12 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
 <button class="btn-ghost" id="deselectAllBtn" onclick="selectNone()">Deselect all</button>
   <button class="btn-ghost" onclick="resetDefaults()">Reset defaults</button>
   <button class="btn-ghost memory" id="restoreLastBtn" style="display:none" onclick="restoreLastSelection()">Restore last</button>
+  <button class="btn-ghost git" id="selectChangedBtn" style="display:none" onclick="selectGit('changed')" title="Check only files that are modified, added, renamed or untracked">Select changed</button>
+  <button class="btn-ghost git" id="selectStagedBtn" style="display:none" onclick="selectGit('staged')" title="Check only files staged in git">Select staged</button>
+  <div class="menu-wrap" id="presetMenuWrap">
+    <button class="btn-ghost" id="presetMenuBtn" type="button" aria-haspopup="menu" aria-expanded="false" onclick="togglePresetMenu(event)">Presets<span class="count-badge" id="presetCount" style="display:none"></span><span class="caret">▾</span></button>
+    <div class="preset-menu" id="presetMenu" role="menu" aria-label="Saved presets" style="display:none"></div>
+  </div>
   <div class="sep"></div>
   <div class="search-wrap">
     <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="1.6">
@@ -599,7 +822,20 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   </div>
   <button class="btn-ghost select-filtered" id="selectFilteredBtn" style="display:none" onclick="selectFiltered()">Select filtered</button>
   <button class="btn-ghost deselect-filtered" id="deselectFilteredBtn" style="display:none" onclick="deselectFiltered()">Deselect filtered</button>
-  <div class="stats-pill" id="statsLabel"><span class="count selected">—</span> / <span class="count">—</span></div>
+
+  <!-- Manage presets (second row, hidden until "Manage Presets" is chosen) -->
+  <div class="preset-manage" id="presetManage" style="display:none">
+    <span class="preset-label">Manage presets</span>
+    <div class="preset-chips" id="presetChips"></div>
+    <button class="btn-ghost" id="presetNewBtn" type="button" onclick="showNewPreset()">+ New preset</button>
+    <span class="preset-new" id="presetNewWrap" style="display:none">
+      <input class="preset-name" id="presetName" type="text" maxlength="60" placeholder="Preset name…" aria-label="New preset name" onkeydown="onPresetNameKey(event)">
+      <button class="btn-ghost" id="presetSaveBtn" type="button" onclick="savePresetClicked()">Save</button>
+      <button class="btn-ghost" type="button" onclick="hideNewPreset()">Cancel</button>
+    </span>
+    <span class="preset-status" id="presetStatus" role="status"></span>
+    <button class="btn-ghost preset-done" type="button" onclick="closeManage()">Done</button>
+  </div>
 </div>
 
 <!-- Tree -->
@@ -612,10 +848,20 @@ function buildPickerHtml(treeNodes, projectName, lastSelection) {
   <button class="btn-generate" id="generateBtn" onclick="generate()">Generate Snapshot</button>
 </div>
 
+<div class="toast" id="presetToast" role="status" aria-live="polite"></div>
+
 <script>
 const vscode = acquireVsCodeApi();
-const TREE = ${treeJson};
+let TREE = ${treeJson};
 const LAST_SELECTION = ${lastSelectionJson};
+// { changed: string[], staged: string[] } from the extension, or null (no git).
+// TREE / GIT_CHANGES / PRESETS are replaced when the reload button rescans.
+let GIT_CHANGES = ${gitChangesJson};
+// [{ name, files }] saved presets. An array on purpose: never keyed by name.
+let PRESETS = ${presetsJson};
+
+// Same function the unit tests run (see src/presets.js).
+${resolvePreset.toString()}
 
 let nodeMap = {};
 let allFileNodes = [];
@@ -638,6 +884,18 @@ function buildUI() {
   if (LAST_SELECTION && LAST_SELECTION.length > 0) {
     document.getElementById('restoreLastBtn').style.display = '';
   }
+  updateGitButtons();
+  renderPresets();
+}
+
+// Rule names only (set by the scanner) — the secret itself never reaches here.
+function hasSecrets(node) {
+  return !node.isDir && Array.isArray(node.secretRules) && node.secretRules.length > 0;
+}
+
+// Default checked state: not ignored by default AND no secret findings.
+function startsChecked(node) {
+  return !node.ignoredByDefault && !hasSecrets(node);
 }
 
 function allDescendantsExcluded(node) {
@@ -702,7 +960,7 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
     cb.type = 'checkbox';
     cb.className = 'node-cb';
     cb.dataset.rel = node.rel;
-    cb.checked = !node.ignoredByDefault;
+    cb.checked = startsChecked(node);
     cbByRel.set(node.rel, cb);
     cb.addEventListener('change', () => {
       if (node.isDir) {
@@ -727,6 +985,15 @@ function renderLevel(nodes, container, depth, ancestorIsLast) {
       chip.className = 'excl-chip';
       chip.textContent = 'x';
       row.appendChild(chip);
+    }
+
+    // secret warning badge — tooltip lists the rule names
+    if (hasSecrets(node)) {
+      const warn = document.createElement('span');
+      warn.className = 'secret-chip';
+      warn.textContent = '⚠';
+      warn.title = 'Possible secret detected: ' + node.secretRules.join(', ');
+      row.appendChild(warn);
     }
 
     // size
@@ -842,7 +1109,19 @@ function resetDefaults() {
   cbByRel.forEach(cb => {
     const node = nodeMap[cb.dataset.rel];
     if (!node || node.isDir) return;
-    cb.checked = !node.ignoredByDefault;
+    cb.checked = startsChecked(node);
+    cb.indeterminate = false;
+  });
+  recomputeAllDirStates();
+  updateStats();
+}
+
+// Replaces the whole selection: exactly the files in relSet end up checked.
+function applySelection(relSet) {
+  cbByRel.forEach(cb => {
+    const node = nodeMap[cb.dataset.rel];
+    if (!node || node.isDir) return;
+    cb.checked = relSet.has(cb.dataset.rel);
     cb.indeterminate = false;
   });
   recomputeAllDirStates();
@@ -851,16 +1130,297 @@ function resetDefaults() {
 
 function restoreLastSelection() {
   if (!LAST_SELECTION || !LAST_SELECTION.length) return;
-  const lastSet = new Set(LAST_SELECTION);
+  applySelection(new Set(LAST_SELECTION));
+}
+
+// ── Git selection ───────────────────────────────────────────────────────────
+// A button is shown only when it has something to select: not a git repo
+// (GIT_CHANGES === null), or nothing changed / nothing staged → hidden.
+function updateGitButtons() {
+  [['selectChangedBtn', 'changed', 'Select changed'], ['selectStagedBtn', 'staged', 'Select staged']]
+    .forEach(([id, key, label]) => {
+      const btn = document.getElementById(id);
+      const n = GIT_CHANGES ? (GIT_CHANGES[key] || []).length : 0;
+      btn.textContent = label + ' (' + n + ')';
+      btn.style.display = n > 0 ? '' : 'none';
+    });
+}
+
+function selectGit(kind) {
+  const list = GIT_CHANGES && GIT_CHANGES[kind];
+  if (!list || !list.length) return;
+  applySelection(new Set(list));
+}
+
+// ── Presets ─────────────────────────────────────────────────────────────────
+// Names are only ever written with textContent / .value — never innerHTML.
+// The "Presets" dropdown (first row) applies a preset on click. Its last item,
+// "Manage Presets", opens a second row to delete presets and create new ones.
+let pendingDelete = null;   // preset name waiting for "Yes / No"
+let pendingSave = null;     // name sent to the extension, waiting for its reply
+let toastTimer = null;
+
+function byId(id) { return document.getElementById(id); }
+
+function setPresetStatus(text, kind) {
+  const el = byId('presetStatus');
+  el.textContent = text || '';
+  el.className = 'preset-status' + (kind ? ' ' + kind : '');
+}
+
+function showToast(text, kind) {
+  const el = byId('presetToast');
+  el.textContent = text;
+  el.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, 3500);
+}
+
+function mk(tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function renderPresets() {
+  // Count badge on the dropdown button.
+  const badge = byId('presetCount');
+  badge.textContent = String(PRESETS.length);
+  badge.style.display = PRESETS.length ? '' : 'none';
+
+  // Dropdown: presets, a divider, then "Manage Presets".
+  const menu = byId('presetMenu');
+  menu.innerHTML = '';
+  if (!PRESETS.length) menu.appendChild(mk('div', 'preset-menu-empty', 'No presets yet'));
+  PRESETS.forEach(p => {
+    const item = mk('button', 'preset-item');
+    item.type = 'button';
+    item.setAttribute('role', 'menuitem');
+    item.title = p.name;
+    item.appendChild(mk('span', 'p-name', p.name));
+    item.appendChild(mk('span', 'p-count', String(p.files.length)));
+    item.addEventListener('click', () => applyPreset(p.name));
+    menu.appendChild(item);
+  });
+  menu.appendChild(mk('div', 'preset-menu-divider'));
+  const manage = mk('button', 'preset-item manage', 'Manage Presets');
+  manage.type = 'button';
+  manage.setAttribute('role', 'menuitem');
+  manage.addEventListener('click', openManage);
+  menu.appendChild(manage);
+
+  // Manage row: one chip per preset with a delete button.
+  const chips = byId('presetChips');
+  chips.innerHTML = '';
+  if (!PRESETS.length) chips.appendChild(mk('span', 'preset-empty', 'No presets yet'));
+  PRESETS.forEach(p => {
+    const chip = mk('span', 'preset-chip');
+    if (pendingDelete === p.name) {
+      chip.classList.add('confirm');
+      chip.appendChild(mk('span', 'c-name', 'Delete "' + p.name + '"?'));
+      const yes = mk('button', 'chip-btn danger', 'Yes');
+      yes.type = 'button';
+      yes.addEventListener('click', () => confirmDelete(p.name));
+      const no = mk('button', 'chip-btn', 'No');
+      no.type = 'button';
+      no.addEventListener('click', () => { pendingDelete = null; renderPresets(); });
+      chip.appendChild(yes);
+      chip.appendChild(no);
+    } else {
+      chip.appendChild(mk('span', 'c-name', p.name));
+      chip.appendChild(mk('span', 'c-count', String(p.files.length)));
+      const del = mk('button', 'chip-btn danger', '✕');
+      del.type = 'button';
+      del.title = 'Delete this preset';
+      del.setAttribute('aria-label', 'Delete preset ' + p.name);
+      del.addEventListener('click', () => { pendingDelete = p.name; renderPresets(); });
+      chip.appendChild(del);
+    }
+    chips.appendChild(chip);
+  });
+}
+
+// ── dropdown ──
+function isPresetMenuOpen() { return byId('presetMenu').style.display !== 'none'; }
+
+function closePresetMenu() {
+  byId('presetMenu').style.display = 'none';
+  byId('presetMenuBtn').setAttribute('aria-expanded', 'false');
+}
+
+function togglePresetMenu(event) {
+  event.stopPropagation();
+  const open = !isPresetMenuOpen();
+  byId('presetMenu').style.display = open ? '' : 'none';
+  byId('presetMenuBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+document.addEventListener('click', (e) => {
+  if (isPresetMenuOpen() && !byId('presetMenuWrap').contains(e.target)) closePresetMenu();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isPresetMenuOpen()) {
+    closePresetMenu();
+    byId('presetMenuBtn').focus();
+  }
+});
+
+// ── manage row ──
+function openManage() {
+  closePresetMenu();
+  pendingDelete = null;
+  setPresetStatus('');
+  byId('presetManage').style.display = '';
+  renderPresets();
+}
+
+function closeManage() {
+  hideNewPreset();
+  pendingDelete = null;
+  byId('presetManage').style.display = 'none';
+  renderPresets();
+}
+
+function showNewPreset() {
+  setPresetStatus('');
+  byId('presetNewBtn').style.display = 'none';
+  byId('presetNewWrap').style.display = '';
+  const input = byId('presetName');
+  input.value = '';
+  input.focus();
+}
+
+// Hides the name field and resets it (used by Save, Cancel and Done).
+function hideNewPreset() {
+  pendingSave = null;
+  byId('presetName').value = '';
+  byId('presetNewWrap').style.display = 'none';
+  byId('presetNewBtn').style.display = '';
+  setPresetStatus('');
+}
+
+function onPresetNameKey(event) {
+  if (event.key === 'Enter') { event.preventDefault(); savePresetClicked(); }
+  else if (event.key === 'Escape') { event.stopPropagation(); hideNewPreset(); }
+}
+
+function getSelectedRels() {
+  const selected = [];
   cbByRel.forEach(cb => {
     const node = nodeMap[cb.dataset.rel];
     if (!node || node.isDir) return;
-    cb.checked = lastSet.has(cb.dataset.rel);
-    cb.indeterminate = false;
+    if (cb.checked) selected.push(cb.dataset.rel);
   });
+  return selected;
+}
+
+function savePresetClicked() {
+  const name = byId('presetName').value.replace(/[\\r\\n\\t]+/g, ' ').trim().slice(0, 60).trim();
+  if (!name) { setPresetStatus('Type a preset name first', 'error'); return; }
+  const selected = getSelectedRels();
+  if (selected.length === 0) { setPresetStatus('Select at least one file to save', 'error'); return; }
+  pendingSave = name;
+  // The extension asks before overwriting, writes .tree/presets.json and replies.
+  vscode.postMessage({ command: 'savePreset', name, selected });
+}
+
+function confirmDelete(name) {
+  pendingDelete = null;
+  vscode.postMessage({ command: 'deletePreset', name });
+}
+
+function findPreset(name) {
+  return PRESETS.find(p => p.name === name) || null;
+}
+
+function applyPreset(name) {
+  closePresetMenu();
+  const preset = findPreset(name);
+  if (!preset) return;
+  const known = new Set(allFileNodes.map(n => n.rel));
+  const res = resolvePreset(preset.files, known);
+  applySelection(new Set(res.present));
+  // Missing paths are dropped and reported once.
+  if (res.missing > 0) showToast('Applied "' + name + '" · ' + res.missing + ' missing', 'warn');
+  else showToast('Applied "' + name + '" · ' + res.present.length + ' file(s)');
+}
+
+// Reply from the extension after a save / delete: the full, updated list.
+window.addEventListener('message', (event) => {
+  const msg = event.data;
+  if (!msg || msg.command !== 'presets') return;
+  PRESETS = Array.isArray(msg.presets) ? msg.presets : [];
+  const status = typeof msg.status === 'string' ? msg.status : '';
+  // A real save starts with "Saved" (see extension.js). "Save cancelled" keeps
+  // the name field open so the user can pick another name.
+  const saved = pendingSave !== null && !msg.error && status.indexOf('Saved') === 0;
+  if (saved) hideNewPreset();
+  renderPresets();
+  setPresetStatus(status, msg.error ? 'error' : '');
+});
+
+// ── Rescan ──────────────────────────────────────────────────────────────────
+// The reload button asks the extension to scan the project again (new/removed
+// files, .gitignore edits, git status, presets). The current selection is kept.
+let rescanning = false;
+
+function rescanClicked() {
+  if (rescanning) return;
+  rescanning = true;
+  const btn = byId('rescanBtn');
+  btn.disabled = true;
+  btn.classList.add('spinning');
+  vscode.postMessage({ command: 'rescan' });
+}
+
+function onRescanResult(msg) {
+  rescanning = false;
+  const btn = byId('rescanBtn');
+  btn.disabled = false;
+  btn.classList.remove('spinning');
+  if (msg.error) { showToast('Rescan failed: ' + msg.error, 'warn'); return; }
+
+  // Per file: is it checked now, and was that its default state?
+  const prev = new Map();
+  allFileNodes.forEach(n => {
+    const cb = cbByRel.get(n.rel);
+    prev.set(n.rel, { checked: !!(cb && cb.checked), def: startsChecked(n) });
+  });
+
+  TREE = Array.isArray(msg.tree) ? msg.tree : [];
+  GIT_CHANGES = msg.gitChanges || null;
+  PRESETS = Array.isArray(msg.presets) ? msg.presets : [];
+  buildUI();
+
+  // Keep the user's choice for files that were already here. A file whose
+  // default changed (for example it is now in .gitignore) takes the new default.
+  let added = 0;
+  allFileNodes.forEach(n => {
+    const p = prev.get(n.rel);
+    if (!p) { added++; return; }
+    if (p.def === startsChecked(n)) {
+      const cb = cbByRel.get(n.rel);
+      if (cb) cb.checked = p.checked;
+    }
+  });
+  const removed = prev.size - (allFileNodes.length - added);
   recomputeAllDirStates();
   updateStats();
+
+  const q = byId('searchInput').value;
+  if (q) filterTree(q);
+
+  let text = 'Rescanned · ' + allFileNodes.length + ' files';
+  if (added) text += ' · +' + added + ' new';
+  if (removed) text += ' · -' + removed + ' removed';
+  showToast(text);
 }
+
+window.addEventListener('message', (event) => {
+  const msg = event.data;
+  if (msg && msg.command === 'rescanResult') onRescanResult(msg);
+});
 
 // ── Filter ──────────────────────────────────────────────────────────────────
 function filterTree(q) {
@@ -975,10 +1535,6 @@ function updateStats() {
     if (cb.checked) selected++;
   });
 
-  const label = document.getElementById('statsLabel');
-  label.innerHTML = '<span class="count selected">' + selected + '</span> / <span class="count">' + total + '</span>';
-  label.classList.toggle('has-selection', selected > 0);
-
   const footer = document.getElementById('footerInfo');
   const btn = document.getElementById('generateBtn');
   if (selected === 0) {
@@ -994,13 +1550,7 @@ function updateStats() {
 
 // ── Generate / Cancel ────────────────────────────────────────────────────────
 function generate() {
-  const selected = [];
-  cbByRel.forEach(cb => {
-    const node = nodeMap[cb.dataset.rel];
-    if (!node || node.isDir) return;
-    if (cb.checked) selected.push(cb.dataset.rel);
-  });
-  vscode.postMessage({ command: 'confirm', selected });
+  vscode.postMessage({ command: 'confirm', selected: getSelectedRels() });
 }
 function cancel() {
   vscode.postMessage({ command: 'cancel' });

@@ -2,6 +2,43 @@
 
 All notable changes to Tree Mapper are documented here.
 
+## v2.8.0 — 2026-11-06
+
+Everything in this release works offline: no network calls and no new dependencies.
+
+### Added
+
+- **Show in Folder and Copy File buttons** — The "Snapshot saved" notification now has **Show in Folder**, **Open File** and **Copy File**. **Copy File** copies the saved snapshot's content to the clipboard (a short "Copied to clipboard" message confirms it, or an error message if it fails). **Show in Folder** opens the `.tree` folder in your OS file manager with the snapshot highlighted. Nothing is ever copied automatically — the clipboard is only touched when you click **Copy File**. Works for structure-only snapshots too; if the file can't be written, no buttons are shown.
+- **`.gitignore` support** — Files matched by `.gitignore` start unchecked in the picker and are hidden from the Workspace Tree. Tree Mapper reads the `.gitignore` of the scanned folder, its parent folders up to the repo root (the folder with `.git`), and nested ones inside it. Each file applies only to paths under its own folder, with `!` negation supported. The built-in list and your `treemapper.defaultIgnorePatterns` are applied after `.gitignore`, so a `!` rule can never re-include a protected secret file. An unreadable `.gitignore` is skipped silently. Turn it off with the new `treemapper.respectGitignore` setting (default `true`).
+- **Secret scan and redaction** — Text files are scanned for private key blocks, AWS access keys, GitHub tokens, Slack tokens, Stripe live keys, Google API keys, JWT-like tokens, `Bearer` tokens and `password` / `secret` / `token` / `api_key` assignments (placeholders such as `your_key_here`, `xxx` and `process.env.X` are ignored). Files with findings show a ⚠ badge (the tooltip lists the rule names) and start unchecked. If you tick one anyway, the new `treemapper.redactSecrets` setting (default `true`) replaces each match with `[REDACTED]` and the snapshot header adds `Secrets redacted: N`. Only the number of findings and the rule names are kept — the secret value is never stored and never sent to the picker. Code fences and the token estimate are computed on the redacted text.
+- **Select changed / Select staged** — In a git repository the picker toolbar gets two buttons that replace the current selection with the files `git status` reports: **Select changed** (modified, added, renamed and untracked) and **Select staged**. Each shows its file count and is hidden while it has nothing to select (no changed files, or no staged files). Paths are converted to the scanned folder, deleted files and files outside the folder are dropped, and default-ignored, binary and oversized files are left out. Not a git repo, or `git` missing → the buttons are hidden, with no error popup. Local `git` only, with a 5-second timeout.
+- **Reload icon in the picker header** — Rescans the project without closing the picker: new and deleted files, `.gitignore` edits, `git status` and presets are refreshed (settings are read again too). Your current selection is kept; files that are new, or whose default state changed (for example they are now in `.gitignore`), take their default state. An active filter stays applied, and a short message reports how many files were added or removed.
+- **Presets** — Save the current selection under a name and bring it back later. The picker toolbar has a **Presets ▾** dropdown: click a preset to apply it. Its last item, **Manage Presets**, opens a second row where you can delete presets (with a Yes / No confirmation) and create new ones with **+ New preset** (the name box only appears while creating and is cleared after saving). Presets are stored in `.tree/presets.json`. Saving over an existing name asks for confirmation. Applying a preset checks exactly its files; paths that no longer exist are dropped and shown once as `N missing`. Names are trimmed and limited to 60 characters.
+
+### Changed
+
+- **The Workspace Tree hides exactly what the picker leaves unchecked by default** — it reuses the scan result instead of building a second ignore matcher, so `.gitignore` rules, the built-in list and your own patterns can't disagree.
+- **The picker toolbar can show a second row** for managing presets (opened from **Presets ▾ → Manage Presets**).
+
+### Fixed
+
+- **Status bar item missing until the first command** — the extension now activates when VS Code finishes starting (`onStartupFinished`), so the Tree Mapper status bar item is there from the start.
+- **Secret scan missed common formats** — unquoted `KEY=value` lines (`.env`, YAML), credentials in URLs (`postgres://user:pass@host`) and `aws_secret_access_key` are now found and redacted. The placeholder filter no longer skips real values that merely contain a word like `example` or `todo` (`MyExamplePassw0rd`).
+- **Select changed / Select staged could tick files with a possible secret** — files with a ⚠ finding are now left out, like default-ignored files.
+- **Folder name was inserted into the picker unescaped** — a folder named like HTML could inject markup into the picker. It is now escaped.
+- **Slow secret scan on odd files** — the private-key search is now linear (a 2 MB file with many `BEGIN … PRIVATE KEY` lines and no end took ~2 s), and the other keyword rules are bounded. Default-ignored files are no longer read for the secret scan.
+- **"Files excluded" counted skipped files twice** — binary and oversized files that were selected but couldn't be included were counted under both `Files skipped` and `Files excluded`. They are now counted only once, under `Files skipped`.
+
+### Internal
+
+- New modules: `src/secretScanner.js` (`scanText`, `redactText`), `src/gitChanges.js` (`getGitChanges`, plus a `git status --porcelain=v1 -z` parser) and `src/presets.js` (`loadPresets`, `savePreset`, `deletePreset`; atomic write via temp file → rename; a corrupt file is treated as empty).
+- `scanWorkspace` takes an `{ respectGitignore }` option and returns `secretCount` / `secretRules` on file entries.
+- `buildPickerHtml(tree, name, lastSelection, gitChanges, presets)` takes the git and preset data as extra arguments. Presets travel to the webview as an array (never an object keyed by name), and the picker embeds the same `resolvePreset()` function the unit tests run.
+- `extension.js` now loads everything the picker shows (scan, git changes, presets) through one `loadPickerData()` helper and reads settings through `loadSettings()`, so the picker's `rescan` message reuses the same code. The picker answers with a `rescanResult` message.
+- `.gitattributes` added (`* text=auto eol=crlf`) so line endings stay CRLF. New tests: `test/hardening.test.js`, `test/gitignore.test.js`, `test/secret-scanner.test.js`, `test/git-changes.test.js` and `test/presets.test.js`.
+
+---
+
 ## v2.7.0 — 2026-10-22
 
 ### Added

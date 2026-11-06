@@ -11,14 +11,14 @@ How to build and publish a new version to GitHub Releases.
 In `package.json`, update the version number:
 
 ```json
-"version": "2.6.1"
+"version": "x.x.x"
 ```
 
 | Change type | When to use |
 |-------------|-------------|
-| `patch` — `2.2.0 → 2.2.1` | Bug fixes |
-| `minor` — `2.2.0 → 2.3.0` | New features |
-| `major` — `2.2.0 → 3.0.0` | Breaking changes |
+| `patch` — `1.0.0 → 1.0.1` | Bug fixes |
+| `minor` — `1.0.0 → 1.1.0` | New features |
+| `major` — `1.0.0 → 2.0.0` | Breaking changes |
 
 Also update these files to match the new version:
 
@@ -28,28 +28,22 @@ Also update these files to match the new version:
 
 ---
 
-### Step 2 — Build the `.vsix`
+### Step 2 — Test the extension and build the `.vsix`
 
 ```bash
 npm install
+```
+```bash
+npm test
+```
+```bash
+npm run lint
 ```
 ```bash
 vsce package
 ```
 
 This creates `tree-mapper-x.x.x.vsix` in the project root.
-
-**Test it before releasing:**
-
-```bash
-code --install-extension tree-mapper-x.x.x.vsix
-```
-
-Right-click a folder in the Explorer and confirm the snapshot generates correctly. Then uninstall:
-
-```bash
-code --uninstall-extension MrDeveloperJIS.tree-mapper
-```
 
 ---
 
@@ -71,7 +65,7 @@ git push origin main --tags
 1. Go to [github.com/MrDeveloperJIS/tree-mapper/releases](https://github.com/MrDeveloperJIS/tree-mapper/releases) → **Draft a new release**
 2. Select tag `vx.x.x`
 3. Set title: `Tree Mapper vx.x.x`
-4. Write release notes (see template below)
+4. Write release notes (copy the structure of `.private/release-note-github.md`)
 5. Attach `tree-mapper-x.x.x.vsix`
 6. Click **Publish release**
 

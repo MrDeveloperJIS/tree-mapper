@@ -1,7 +1,5 @@
 'use strict';
 
-const ignore = require('ignore');
-
 /**
  * Builds two trees:
  *
@@ -11,31 +9,18 @@ const ignore = require('ignore');
  *   snapshotTreeLines  — only the files the user checked and included
  *                        in this snapshot run
  *
- * @param {string[]}        files                 - relative paths of INCLUDED files
- * @param {string[]}        [defaultIgnorePatterns]- patterns from treemapper.defaultIgnorePatterns
- * @param {Array<{rel:string,isDir:boolean}>} [allEntries] - full flat entry list from scanner
+ * The workspace tree reuses the scanner's verdict (`ignoredByDefault` on each
+ * entry), so it hides exactly what the picker leaves unchecked by default:
+ * .gitignore rules, built-in patterns and user patterns, with no second matcher.
+ *
+ * @param {string[]} files - relative paths of INCLUDED files
+ * @param {Array<{rel:string,isDir:boolean,ignoredByDefault?:boolean}>} [allEntries] - flat entry list from scanner
  * @returns {{ workspaceTreeLines: string[], snapshotTreeLines: string[] }}
  */
-function buildTree(
-    files,
-    defaultIgnorePatterns = [],
-    allEntries = [],
-) {
+function buildTree(files, allEntries = []) {
     // ── Workspace tree ────────────────────────────────────────────────────────
-    // Show every file/dir that is NOT matched by the default ignore patterns.
-    // This mirrors the Explorer view (same rules as defaultIgnorePatterns).
-    const ig = ignore();
-    if (defaultIgnorePatterns.length > 0) {
-        ig.add(defaultIgnorePatterns);
-    }
-    ig.add('.tree/');
-
     const workspacePaths = allEntries
-        .filter((e) => {
-            if (e.isDir) return false; // dirs are implied by their files
-            const rel = e.rel;
-            return !ig.ignores(rel);
-        })
+        .filter((e) => !e.isDir && !e.ignoredByDefault) // dirs are implied by their files
         .map((e) => e.rel);
 
     const workspaceTreeLines = renderTree(workspacePaths);

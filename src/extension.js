@@ -5,9 +5,12 @@ const path = require('path');
 const fs = require('fs');
 const { scanWorkspace } = require('./scanner');
 const { buildTree } = require('./treeBuilder');
+const { partitionSelection } = require('./selection');
 const { renderMarkdown, renderStructureOnly } = require('./markdownRenderer');
 const { buildPickerHtml } = require('./pickerHtml');
 const { resolveIgnorePatterns, cleanUserPatterns } = require('./ignorePatterns');
+const { getGitChanges } = require('./gitChanges');
+const { loadPresets, savePreset, deletePreset, normalizeName } = require('./presets');
 
 /** @type {vscode.StatusBarItem} */
 let statusBarItem;
@@ -48,27 +51,22 @@ function activate(context) {
             rootPath = folder.uri.fsPath;
         }
 
-        const config = vscode.workspace.getConfiguration('treemapper');
-        const maxFileSizeKB = config.get('maxFileSizeKB') || 2048;
-        const keepLastSnapshots = config.get('keepLastSnapshots') || 10;
-        const defaultIgnorePatterns = resolveIgnorePatterns(config);
+        let settings = loadSettings();
 
         // ── Step 1: Pre-scan everything (no ignore filtering) ──────────────────
         updateStatusBar('$(sync~spin) Scanning…', 'Tree Mapper: Scanning files…');
 
-        let allEntries;
+        let picker;
         try {
-            allEntries = await scanWorkspace(rootPath, maxFileSizeKB, defaultIgnorePatterns);
+            picker = await loadPickerData(rootPath, settings);
         } catch (err) {
             vscode.window.showErrorMessage(`Tree Mapper scan error: ${err.message}`);
             resetStatusBar();
             return;
         }
-
-        updateStatusBar(
-            `$(file-directory) Tree Mapper — ${allEntries.ignored} ignored`,
-            `Tree Mapper: ${allEntries.total} files found, ${allEntries.ignored} ignored by default`
-        );
+        // Both are replaced when the picker's reload button rescans the project.
+        let { allEntries, knownFiles } = picker;
+        showScanStatus(allEntries);
 
         // ── Load last selection for this root ────────────────────────────────────
         const lastSelection = loadLastSelection(rootPath);
@@ -81,20 +79,60 @@ function activate(context) {
             { enableScripts: true, retainContextWhenHidden: true }
         );
 
-        panel.webview.html = buildPickerHtml(allEntries.tree, path.basename(rootPath), lastSelection);
+        panel.webview.html = buildPickerHtml(allEntries.tree, path.basename(rootPath), lastSelection, picker.gitChanges, picker.presets);
+
+        let pickerClosed = false;
+        let rescanning = false;
+
+        // Reload button: scan again and send the picker the fresh data.
+        async function handleRescan() {
+            if (rescanning || pickerClosed) return;
+            rescanning = true;
+            updateStatusBar('$(sync~spin) Scanning…', 'Tree Mapper: Scanning files…');
+            try {
+                const nextSettings = loadSettings();
+                const next = await loadPickerData(rootPath, nextSettings);
+                if (pickerClosed) return;
+                settings = nextSettings;
+                allEntries = next.allEntries;
+                knownFiles = next.knownFiles;
+                showScanStatus(allEntries);
+                panel.webview.postMessage({
+                    command: 'rescanResult',
+                    tree: next.allEntries.tree,
+                    gitChanges: next.gitChanges,
+                    presets: next.presets,
+                });
+            } catch (err) {
+                resetStatusBar();
+                try {
+                    panel.webview.postMessage({ command: 'rescanResult', error: err.message });
+                } catch {
+                    // picker was closed while we were busy
+                }
+            } finally {
+                rescanning = false;
+            }
+        }
 
         // Wait for user to confirm or cancel
         const selected = await new Promise((resolve) => {
             panel.webview.onDidReceiveMessage((msg) => {
+                if (!msg) return;
                 if (msg.command === 'confirm') {
                     resolve(msg.selected); // string[] of relative paths
                 } else if (msg.command === 'cancel') {
                     resolve(null);
+                } else if (msg.command === 'savePreset' || msg.command === 'deletePreset') {
+                    handlePresetMessage(panel, rootPath, knownFiles, msg);
+                } else if (msg.command === 'rescan') {
+                    handleRescan();
                 }
             });
             panel.onDidDispose(() => resolve(null));
         });
 
+        pickerClosed = true;
         panel.dispose();
 
         if (!selected) {
@@ -108,51 +146,16 @@ function activate(context) {
         // ── Step 3: Generate snapshot from selected files ────────────────────────
         updateStatusBar('$(sync~spin) Generating…', 'Tree Mapper: Generating snapshot…');
 
-        // O(1) lookups by relative path instead of Array#find() per file, which
-        // was effectively O(n²) over the whole selection.
-        const entryByRel = new Map(allEntries.entries.map((e) => [e.rel, e]));
-
-        let totalSizeBytes = 0;
-        let skippedCount = 0;
-        /** @type {{ rel: string, reason: string }[]} */
-        const skippedFiles = [];
-        const validFiles = [];
-
-        for (const rel of selected) {
-            const entry = entryByRel.get(rel);
-            if (!entry || entry.isDir) continue;
-
-            if (entry.skipped && !entry.isBinary && entry.size <= (maxFileSizeKB * 1024)) {
-                entry.skipped = false;
-            }
-
-            if (entry.skipped) {
-                skippedCount++;
-                skippedFiles.push({
-                    rel,
-                    reason: entry.isBinary
-                        ? 'binary file'
-                        : `exceeds size limit (${(entry.size / 1024).toFixed(1)} KB)`,
-                });
-                continue;
-            }
-
-            totalSizeBytes += entry.size;
-            validFiles.push(rel);
-        }
-
-        const allFilePaths = allEntries.entries
-            .filter((e) => !e.isDir)
-            .map((e) => e.rel);
-
-        const validSet = new Set(validFiles);
-        const excludedSet = new Set(
-            allFilePaths.filter((r) => !validSet.has(r))
-        );
+        const {
+            validFiles,
+            skippedFiles,
+            skippedCount,
+            excludedCount,
+            totalSizeBytes,
+        } = partitionSelection(selected, allEntries.entries, settings.maxFileSizeKB);
 
         const { workspaceTreeLines, snapshotTreeLines } = buildTree(
             validFiles,
-            defaultIgnorePatterns,
             allEntries.entries,
         );
 
@@ -177,8 +180,9 @@ function activate(context) {
                     validFiles,
                     totalSizeBytes,
                     skippedCount,
-                    excludedSet.size,
+                    excludedCount,
                     skippedFiles,
+                    { redactSecrets: settings.redactSecrets },
                 );
             }
         );
@@ -202,23 +206,30 @@ function activate(context) {
             outFile = null;
         }
 
-        pruneSnapshots(outDir, keepLastSnapshots);
+        pruneSnapshots(outDir, settings.keepLastSnapshots);
 
         resetStatusBar();
 
+        // Write failed → no buttons.
         if (!outFile) return;
 
-        // ── "Open File" notification ────────────────────────────────────────────
+        // ── Snapshot-saved notification: Show in Folder | Open File | Copy File ────
         const timestamp = path.basename(outFile, '.md');
 
         const choice = await vscode.window.showInformationMessage(
             `Tree Mapper: Snapshot saved → .tree/${timestamp}.md`,
-            'Open File'
+            'Show in Folder',
+            'Open File',
+            'Copy File'
         );
 
         if (choice === 'Open File') {
             const doc = await vscode.workspace.openTextDocument(outFile);
             await vscode.window.showTextDocument(doc);
+        } else if (choice === 'Copy File') {
+            await copySnapshotToClipboard(outFile);
+        } else if (choice === 'Show in Folder') {
+            await revealSnapshotInOS(outFile);
         }
     });
 
@@ -226,6 +237,136 @@ function activate(context) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Current Tree Mapper settings (read again on every rescan). */
+function loadSettings() {
+    const config = vscode.workspace.getConfiguration('treemapper');
+    return {
+        maxFileSizeKB: config.get('maxFileSizeKB') || 2048,
+        keepLastSnapshots: config.get('keepLastSnapshots') || 10,
+        respectGitignore: config.get('respectGitignore') !== false,
+        redactSecrets: config.get('redactSecrets') !== false,
+        defaultIgnorePatterns: resolveIgnorePatterns(config),
+    };
+}
+
+/**
+ * Everything the picker shows: the scan, the git changes and the presets.
+ * Used when the picker opens and again on every rescan.
+ */
+async function loadPickerData(rootPath, settings) {
+    const allEntries = await scanWorkspace(
+        rootPath,
+        settings.maxFileSizeKB,
+        settings.defaultIgnorePatterns,
+        { respectGitignore: settings.respectGitignore }
+    );
+
+    // Git changes (local `git status`). Only plain, readable files that start
+    // checked-able: default-ignored files (secret protection, .gitignore, ...),
+    // binary/oversized files and files with a possible secret (⚠) are never offered. null → not a git repo /
+    // git missing → no buttons.
+    const selectableRels = new Set(
+        allEntries.entries
+            .filter((e) => !e.isDir && !e.ignoredByDefault && !e.skipped && !(e.secretCount > 0))
+            .map((e) => e.rel)
+    );
+    const gitChanges = await getGitChanges(rootPath, (rel) => selectableRels.has(rel));
+
+    // Presets (.tree/presets.json)
+    const presets = loadPresets(rootPath);
+    const knownFiles = new Set(
+        allEntries.entries.filter((e) => !e.isDir).map((e) => e.rel)
+    );
+
+    return { allEntries, gitChanges, presets, knownFiles };
+}
+
+function showScanStatus(allEntries) {
+    updateStatusBar(
+        `$(file-directory) Tree Mapper — ${allEntries.ignored} ignored`,
+        `Tree Mapper: ${allEntries.total} files found, ${allEntries.ignored} ignored by default`
+    );
+}
+
+/**
+ * savePreset / deletePreset requests from the picker. Writes
+ * .tree/presets.json and replies with the full, updated list.
+ * (Overwrite confirmation lives here: webviews can't show confirm().)
+ */
+async function handlePresetMessage(panel, rootPath, knownFiles, msg) {
+    const reply = (payload) => {
+        try {
+            panel.webview.postMessage({ command: 'presets', ...payload });
+        } catch {
+            // picker was closed while we were busy
+        }
+    };
+
+    try {
+        const name = normalizeName(msg.name);
+        if (!name) {
+            reply({ presets: loadPresets(rootPath), status: 'Preset name is empty', error: true });
+            return;
+        }
+
+        if (msg.command === 'deletePreset') {
+            const list = deletePreset(rootPath, name);
+            reply({ presets: list, select: '', status: `Deleted "${name}"` });
+            return;
+        }
+
+        // savePreset: only real files from this scan are stored.
+        const files = Array.isArray(msg.selected)
+            ? msg.selected.filter((r) => typeof r === 'string' && knownFiles.has(r))
+            : [];
+        if (files.length === 0) {
+            reply({ presets: loadPresets(rootPath), status: 'Select at least one file to save', error: true });
+            return;
+        }
+
+        const current = loadPresets(rootPath);
+        if (current.some((p) => p.name === name)) {
+            const pick = await vscode.window.showWarningMessage(
+                `Tree Mapper: overwrite preset "${name}"?`,
+                { modal: true },
+                'Overwrite'
+            );
+            if (pick !== 'Overwrite') {
+                reply({ presets: current, select: name, status: 'Save cancelled' });
+                return;
+            }
+        }
+
+        const list = savePreset(rootPath, name, files);
+        reply({ presets: list, select: name, status: `Saved "${name}" (${files.length} files)` });
+    } catch (err) {
+        reply({ presets: loadPresets(rootPath), status: `Preset error: ${err.message}`, error: true });
+    }
+}
+
+/**
+ * Copy the saved snapshot's content to the clipboard.
+ * Only ever called from the "Copy File" button — nothing is copied automatically.
+ */
+async function copySnapshotToClipboard(filePath) {
+    try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        await vscode.env.clipboard.writeText(content);
+        vscode.window.showInformationMessage('Tree Mapper: Copied to clipboard');
+    } catch (err) {
+        vscode.window.showErrorMessage(`Tree Mapper: Could not copy file — ${err.message}`);
+    }
+}
+
+/** Open the .tree folder in the OS file manager with the snapshot highlighted. */
+async function revealSnapshotInOS(filePath) {
+    try {
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(filePath));
+    } catch (err) {
+        vscode.window.showErrorMessage(`Tree Mapper: Could not reveal file — ${err.message}`);
+    }
+}
 
 function updateStatusBar(text, tooltip) {
     if (!statusBarItem) return;
