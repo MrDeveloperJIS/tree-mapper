@@ -85,7 +85,8 @@ const terminalLines = [
     { type: 'out', text: '' },
     { type: 'out', text: 'scanning workspace…' },
     { type: 'out', text: 'building file picker…' },
-    { type: 'out', text: '14 files selected' },
+    { type: 'out', text: '.gitignore applied · 14 files selected' },
+    { type: 'warn', text: '⚠ 1 file with a secret, left unchecked' },
     { type: 'out', text: 'rendering markdown…' },
     { type: 'out', text: '' },
     { type: 'tree', text: 'src/' },
@@ -95,7 +96,7 @@ const terminalLines = [
     { type: 'tree', text: '└── <span class="file-js">languageMap.js</span>' },
     { type: 'out', text: '' },
     { type: 'success', text: 'snapshot saved →' },
-    { type: 'success', text: '.tree/2026-09-06-14-35-22.md' },
+    { type: 'success', text: '.tree/2026-11-06-14-35-22.md' },
     { type: 'out', text: '' },
     { type: 'prompt', text: '' },
 ];
@@ -122,6 +123,8 @@ function typeLine() {
         div.innerHTML = `<span class="t-prompt">$</span><span class="t-cmd"> ${line.text}</span>`;
     } else if (line.type === 'tree') {
         div.innerHTML = `<span class="t-tree">${line.text}</span>`;
+    } else if (line.type === 'warn') {
+        div.innerHTML = `<span class="t-warn">${line.text}</span>`;
     } else if (line.type === 'success') {
         div.innerHTML = `<span class="t-success">${line.text}</span>`;
     } else if (line.type === 'prompt') {

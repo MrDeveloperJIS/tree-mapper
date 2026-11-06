@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════
    TREE MAPPER — style.css
-   Minimal dark. IBM Plex Mono + IBM Plex Sans.
-   Accent: forest green + trunk brown (from the mark)
+   Midnight navy + emerald + amber. IBM Plex Mono + Sans.
+   Palette is derived from the icon: navy tile, emerald
+   tree, warm trunk (amber = warnings / secrets only).
 ═══════════════════════════════════════════ */
 
 *,
@@ -13,18 +14,20 @@
 }
 
 :root {
-    --bg: #0a0a0b;
-    --bg-raised: #131315;
-    --bg-raised-2: #19191c;
-    --border: rgba(255, 255, 255, 0.09);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --text: #ececea;
-    --text-dim: #a3a39d;
-    --muted: #6d6d67;
-    --green: #6bad84;
-    --green-bright: #86c99d;
-    --green-soft: rgba(107, 173, 132, 0.13);
-    --trunk: #b17f45;
+    --bg: #0a1424;
+    --bg-raised: #101f35;
+    --bg-raised-2: #16294a;
+    --border: rgba(160, 190, 230, 0.10);
+    --border-strong: rgba(160, 190, 230, 0.22);
+    --text: #e9eff7;
+    --text-dim: #aab9cc;
+    --muted: #7a8ca5;
+    --green: #34d399;
+    --green-bright: #6ee7b7;
+    --green-soft: rgba(52, 211, 153, 0.14);
+    --trunk: #e0a85f;
+    --trunk-soft: rgba(224, 168, 95, 0.14);
+    --on-green: #04140d;
 
     --mono: 'IBM Plex Mono', ui-monospace, monospace;
     --sans: 'IBM Plex Sans', -apple-system, sans-serif;
@@ -55,7 +58,11 @@ html {
 }
 
 body {
-    background: var(--bg);
+    background:
+        radial-gradient(900px 520px at 85% -120px, rgba(52, 211, 153, 0.10), transparent 70%),
+        radial-gradient(700px 480px at -10% 0, rgba(70, 110, 200, 0.10), transparent 70%),
+        var(--bg);
+    background-repeat: no-repeat;
     color: var(--text);
     font-family: var(--sans);
     font-size: 16px;
@@ -132,7 +139,7 @@ h4 {
 
 .kicker::before {
     content: '// ';
-    color: var(--muted);
+    color: var(--trunk);
 }
 
 /* ── Reveal (single orchestrated fade-up, used once per section) ── */
@@ -169,7 +176,7 @@ h4 {
 
 .btn-primary {
     background: var(--green);
-    color: #0a0f0b;
+    color: var(--on-green);
 }
 
 .btn-primary:hover {
@@ -201,7 +208,7 @@ h4 {
     align-items: center;
     justify-content: space-between;
     padding: 20px var(--pad);
-    background: rgba(10, 10, 11, 0.7);
+    background: rgba(10, 20, 36, 0.72);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid transparent;
     transition: border-color 0.3s var(--ease), background 0.3s var(--ease);
@@ -209,7 +216,7 @@ h4 {
 
 .nav.scrolled {
     border-bottom-color: var(--border);
-    background: rgba(10, 10, 11, 0.92);
+    background: rgba(10, 20, 36, 0.94);
 }
 
 .nav-logo {
@@ -353,6 +360,7 @@ h4 {
 }
 
 .term-chrome {
+    background: var(--bg-raised-2);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -395,7 +403,7 @@ h4 {
     font-family: var(--mono);
     font-size: 0.86rem;
     padding: 20px;
-    min-height: 360px;
+    min-height: 365px;
     line-height: 1.7;
 }
 
@@ -425,6 +433,10 @@ h4 {
 
 .t-success {
     color: var(--green-bright);
+}
+
+.t-warn {
+    color: var(--trunk);
 }
 
 .t-cursor {
@@ -698,4 +710,12 @@ section+section {
         flex-direction: column;
         align-items: flex-start;
     }
+}
+
+.btn-ghost:hover {
+    background: var(--green-soft);
+}
+
+.tree-item:hover .tree-branch {
+    color: var(--green);
 }

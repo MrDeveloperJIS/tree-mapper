@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tree Mapper — Workspace Snapshots for VS Code</title>
-    <meta name="description" content="Right-click any folder in VS Code. Get a complete Markdown snapshot — full directory tree and every file's source, ready for AI.">
+    <meta name="description" content="Right-click any folder in VS Code. Get one Markdown snapshot — full directory tree and every file's source, with secrets redacted, .gitignore respected and a token count. Runs fully offline.">
+    <meta name="theme-color" content="#0a1424">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -57,6 +58,8 @@
             <div class="hero-meta" data-reveal>
                 <span>Free, MIT licensed</span>
                 <span>·</span>
+                <span>Runs offline</span>
+                <span>·</span>
                 <a href="https://marketplace.visualstudio.com/items?itemName=MrDeveloperJIS.tree-mapper" target="_blank" rel="noopener">Marketplace</a>
                 <span>·</span>
                 <a href="https://github.com/MrDeveloperJIS/tree-mapper/releases" target="_blank" rel="noopener" data-download-btn>.vsix download</a>
@@ -97,20 +100,32 @@
 
                 <div class="tree-item">
                     <span class="tree-branch">├──</span>
+                    <h3>Secrets redacted</h3>
+                    <p>API keys, tokens, private keys and passwords are caught locally and replaced with <code>[REDACTED]</code>. Files with a finding start unchecked and get a ⚠ badge.</p>
+                </div>
+
+                <div class="tree-item">
+                    <span class="tree-branch">├──</span>
+                    <h3>Respects .gitignore</h3>
+                    <p>Ignored files start unchecked and stay out of the tree. Parent and nested <code>.gitignore</code> files are honored, with <code>!</code> negation.</p>
+                </div>
+
+                <div class="tree-item">
+                    <span class="tree-branch">├──</span>
                     <h3>Interactive file picker</h3>
-                    <p>Check exactly which files go in. Search, filter, and reuse your last selection — fast even on workspaces with thousands of files.</p>
+                    <p>Check exactly which files go in. Search, filter, restore your last selection or save named <strong>presets</strong> — fast even with thousands of files.</p>
                 </div>
 
                 <div class="tree-item">
                     <span class="tree-branch">├──</span>
-                    <h3>Jump-to-file index</h3>
-                    <p>Every snapshot opens with a linked index, so you can jump straight to one file instead of scrolling a long document.</p>
+                    <h3>Select changed / staged</h3>
+                    <p>One click picks the files <code>git status</code> reports, so you can snapshot exactly what you're working on.</p>
                 </div>
 
                 <div class="tree-item">
                     <span class="tree-branch">├──</span>
-                    <h3>Token count</h3>
-                    <p>Each snapshot's header estimates its token count, so you know how much context it'll use before pasting it anywhere.</p>
+                    <h3>Index &amp; token count</h3>
+                    <p>Every snapshot opens with a linked jump-to-file index and an estimated token count, so you know how much context it'll use before pasting.</p>
                 </div>
 
                 <div class="tree-item">
@@ -144,14 +159,14 @@
                 <div class="step">
                     <span class="step-num">3</span>
                     <h3>Get your markdown</h3>
-                    <p>Saved to <code>.tree/</code>, with an <strong>Open File</strong> button waiting in the notification.</p>
+                    <p>Saved to <code>.tree/</code>. The notification offers <strong>Show in Folder</strong>, <strong>Open File</strong> and <strong>Copy File</strong> — nothing touches your clipboard until you click.</p>
                 </div>
             </div>
 
             <div class="install-strip" data-reveal>
                 <div>
                     <p>Get started in under 30 seconds.</p>
-                    <p class="install-sub">No account, no config.</p>
+                    <p class="install-sub">No account, no config, no network calls.</p>
                 </div>
                 <div class="install-right">
                     <a href="vscode:extension/MrDeveloperJIS.tree-mapper" class="btn btn-primary">Install in VS Code</a>
