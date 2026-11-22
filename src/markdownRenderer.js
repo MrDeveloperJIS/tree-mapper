@@ -118,7 +118,7 @@ function renderStructureOnly(rootPath, workspaceTreeLines) {
 
 /**
  * @param {string}   rootPath
- * @param {string[]} workspaceTreeLines  - full workspace tree (excl. default-ignored)
+ * @param {string[]} workspaceTreeLines  - full workspace tree
  * @param {string[]} snapshotTreeLines   - only the included files
  * @param {string[]} files               - included file relative paths
  * @param {number}   totalSizeBytes
@@ -177,7 +177,7 @@ function renderMarkdown(
     // ── Workspace Tree ────────────────────────────────────────────────────────
     bodyParts.push('## Workspace Tree');
     bodyParts.push('');
-    bodyParts.push('> Full repository structure, excluding default-ignored paths.');
+    bodyParts.push('> Full repository structure. Folders end with `/`. Ignored files and folders are listed by name only; their contents are not included.');
     bodyParts.push('');
     bodyParts.push('```');
     bodyParts.push(projectName + '/');

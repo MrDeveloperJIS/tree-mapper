@@ -154,9 +154,12 @@ function activate(context) {
             totalSizeBytes,
         } = partitionSelection(selected, allEntries.entries, settings.maxFileSizeKB);
 
+        // `prunedDirs` = node_modules / .git folders the scan never opened. They
+        // are passed in so the Workspace Tree can list them by name.
         const { workspaceTreeLines, snapshotTreeLines } = buildTree(
             validFiles,
             allEntries.entries,
+            allEntries.prunedDirs,
         );
 
         // The actual slow part is reading every selected file's contents — wrap

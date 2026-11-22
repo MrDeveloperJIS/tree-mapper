@@ -1,4 +1,4 @@
-## 🌲 Tree Mapper v2.8.0
+## 🌲 Tree Mapper v2.9.0
 
 Tree Mapper generates rich Markdown snapshots of your workspace directly from VS Code. Select exactly which files to include via an interactive file picker, and get a structured snapshot with a full project tree, language-aware code blocks, token count estimates, and more — saved to `.tree/` and ready to paste into any LLM context.
 
@@ -7,11 +7,11 @@ Tree Mapper generates rich Markdown snapshots of your workspace directly from VS
 * Interactive file picker with checkbox tree, filter search, select/deselect controls, and last-selection memory
 * Select changed / Select staged — pick files straight from `git status`
 * Presets — save and re-apply named selections
-* `.gitignore` support — ignored files start unchecked and are hidden from the Workspace Tree
+* `.gitignore` support — ignored files start unchecked and are listed in the Workspace Tree by name only
 * Secret scan with `[REDACTED]` output — common keys, tokens, passwords and private keys are replaced in the snapshot (a safety net, not a guarantee)
 * Show in Folder, Open File and Copy File buttons on the "Snapshot saved" notification
 * Structure-only snapshots — generate with nothing selected to get just the project tree
-* Dual tree sections — full workspace tree + snapshot-only tree
+* Dual tree sections — full workspace tree (ignored files and folders shown by name only) + snapshot-only tree
 * Language-aware fenced code blocks for 60+ file types
 * Token count estimate in every snapshot header
 * Secret and credential files unchecked by default via a built-in ignore list
@@ -23,24 +23,16 @@ Tree Mapper generates rich Markdown snapshots of your workspace directly from VS
 
 ---
 
-### What's new in v2.8.0
-
-### Added
-
-- **Show in Folder and Copy File buttons** — The "Snapshot saved" notification now has **Show in Folder**, **Open File** and **Copy File**. **Copy File** copies the snapshot to the clipboard (only when you click it — nothing is copied automatically). **Show in Folder** opens the `.tree` folder in your OS file manager with the snapshot highlighted.
-- **`.gitignore` support** — files matched by `.gitignore` (the scanned folder, its parents up to the repo root, and nested ones) start unchecked and are hidden from the Workspace Tree. Built-in secret protection can never be overridden by a `!` rule. New setting `treemapper.respectGitignore` (default `true`).
-- **Secret scan and redaction** — files containing private keys, AWS / GitHub / Slack / Stripe / Google keys, JWTs, Bearer tokens or `password` / `token` / `api_key` assignments show a ⚠ badge and start unchecked. If you tick one anyway, matches are replaced with `[REDACTED]` and the header adds `Secrets redacted: N`. The secret value is never stored or sent to the picker. New setting `treemapper.redactSecrets` (default `true`).
-- **Select changed / Select staged** — in a git repository, two new picker buttons replace the selection with the files from `git status` (modified, added, renamed and untracked / staged). Hidden when the folder isn't a git repo or `git` is missing.
-- **Presets** — save the current selection under a name, then apply or delete it later from the picker. Stored in `.tree/presets.json`; overwriting asks for confirmation, and missing files are dropped and shown as `N missing`.
+### What's new in v2.9.0
 
 ### Changed
 
-- **The Workspace Tree hides exactly what the picker leaves unchecked by default**, including `.gitignore` matches.
-- **The picker toolbar has a second row** for presets.
+- **The Workspace Tree now lists ignored files and folders by name** — before, anything the picker leaves unchecked by default (`.env`, `*.pem`, `dist/`, `.gitignore` matches, …) disappeared from the tree, so you couldn't tell where a file lived. Now an ignored file is listed like any other file, and an ignored folder is listed as `name/` with nothing under it. Contents are still never included. This also covers `node_modules/` and `.git/` at any depth (the scan still never opens them). The tool's own `.tree/` folder is not listed.
+- **Folders end with `/`** in both the Workspace Tree and the Snapshot Tree, and empty folders are now shown.
 
 ### Fixed
 
-- **"Files excluded" counted skipped files twice** — binary and oversized files are now counted only under `Files skipped`.
+- **A file named `constructor`, `__proto__` or `toString`** could break tree rendering. The tree is now built with `Map`s.
 
 See the [CHANGELOG](https://github.com/MrDeveloperJIS/tree-mapper/blob/HEAD/CHANGELOG.md) for the full list, including internal changes.
 
@@ -49,7 +41,7 @@ See the [CHANGELOG](https://github.com/MrDeveloperJIS/tree-mapper/blob/HEAD/CHAN
 ### 📦 Installation
 
 **Via VSIX (this page):**
-1. Download `tree-mapper-2.8.0.vsix` below
+1. Download `tree-mapper-2.9.0.vsix` below
 2. Extensions panel (`Ctrl+Shift+X`) → **⋯ menu** → **Install from VSIX…**
 3. Select the file and reload VS Code
 

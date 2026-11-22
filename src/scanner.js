@@ -24,12 +24,20 @@ const { scanText } = require('./secretScanner');
  *                             //  rule names only, never the secret itself)
  *     total: number,          // total file count
  *     ignored: number,        // files flagged as ignoredByDefault
+ *     prunedDirs: string[],   // node_modules / .git folders that were pruned
+ *                             // from the scan. Never opened or read; only their
+ *                             // NAMES are kept so the Workspace Tree can list them.
  *   }
  */
 const BINARY_SNIFF_BYTES = 8192;
 
 // Heavy folders that are never useful in a snapshot. Pruned at glob time.
 const ALWAYS_PRUNE = ['**/node_modules/**', '**/.git/**', '**/.tree/**'];
+
+// Of the pruned folders, these are still shown BY NAME in the Workspace Tree
+// (as `node_modules/`), so you can see where they sit. Their contents are never
+// scanned. `.tree/` is the tool's own output folder, so it is not listed.
+const LISTED_PRUNED_DIRS = ['node_modules', '.git'];
 
 /**
  * Cheap binary-file detection: reads only the first BINARY_SNIFF_BYTES of the
@@ -282,7 +290,37 @@ async function scanWorkspace(rootPath, maxFileSizeKB = 2048, defaultIgnorePatter
         entries: entryMetas,
         total: totalFiles,
         ignored: ignoredFiles,
+        prunedDirs: findPrunedDirs(rootPath, entryMetas),
     };
+}
+
+/**
+ * Finds the pruned folders (node_modules, .git) that exist, WITHOUT walking
+ * into them: for every scanned folder (and the root) it only checks whether a
+ * child with that name exists. Returns scanned-folder-relative posix paths.
+ *
+ * @param {string} rootPath
+ * @param {Array<{rel:string,isDir:boolean}>} entryMetas
+ * @returns {string[]}
+ */
+function findPrunedDirs(rootPath, entryMetas) {
+    const parents = [''];
+    for (const e of entryMetas) {
+        if (e.isDir) parents.push(e.rel);
+    }
+
+    const found = [];
+    for (const parent of parents) {
+        for (const name of LISTED_PRUNED_DIRS) {
+            const rel = parent ? `${parent}/${name}` : name;
+            try {
+                if (fs.lstatSync(path.join(rootPath, rel)).isDirectory()) found.push(rel);
+            } catch {
+                /* not there, or unreadable: nothing to list */
+            }
+        }
+    }
+    return found.sort((a, b) => a.localeCompare(b));
 }
 
 /**

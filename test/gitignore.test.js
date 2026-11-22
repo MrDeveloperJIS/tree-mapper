@@ -138,7 +138,7 @@ test('unreadable or odd .gitignore is skipped silently', async () => {
     assert.ok(res.entries.some((e) => e.rel === 'a.js'));
 });
 
-test('Workspace Tree hides the same paths the picker leaves unchecked', async () => {
+test('Workspace Tree lists the paths the picker leaves unchecked, by name only', async () => {
     const root = makeProject({
         '.gitignore': 'out/\n*.local\n',
         'src/a.js': 'x',
@@ -146,8 +146,9 @@ test('Workspace Tree hides the same paths the picker leaves unchecked', async ()
         'c.local': 'x',
     });
     const res = await scanWorkspace(root, 2048, BUILTIN);
-    const text = buildTree([], res.entries).workspaceTreeLines.join('\n');
+    const text = buildTree([], res.entries, res.prunedDirs).workspaceTreeLines.join('\n');
     assert.ok(text.includes('a.js'));
-    assert.ok(!text.includes('b.js'));
-    assert.ok(!text.includes('c.local'));
+    assert.ok(/out\/$/m.test(text), 'ignored folder is listed by name');
+    assert.ok(!text.includes('b.js'), 'but not what is inside it');
+    assert.ok(/c\.local$/m.test(text), 'ignored file is listed by name');
 });

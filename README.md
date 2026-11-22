@@ -9,7 +9,7 @@
 Right-click any folder in VS Code's Explorer → **Tree Mapper: Generate Snapshot** → get a single `.md` file with everything inside:
 
 - An **Index** linking to every section, plus a clickable **file jump-list** so you can find a specific file instantly even in large snapshots
-- A **Workspace Tree** — full `├──` / `└──` view of the repository, matching what you see in the Explorer sidebar
+- A **Workspace Tree** — full `├──` / `└──` view of the repository, so you can see where every file lives. Ignored files and folders (`node_modules/`, `.env`, secrets…) appear by name only; their contents are never included
 - A **Snapshot Tree** — the same tree format, scoped to only the files you chose to include
 - Every included file's source code in **language-aware fenced blocks** (60+ languages), each followed by a **Back to top** link
 - A **snapshot header** with timestamp, file counts, total repo size, and estimated token count
@@ -57,7 +57,7 @@ Before generating, Tree Mapper opens a full-screen webview panel with every file
 - files matching the [built-in ignore list](#default-ignore-patterns) (see [built-in ignore patterns](docs/IGNORE_PATTERNS.md)) — plus anything you've added via `treemapper.defaultIgnorePatterns` — marked with an **excluded** badge,
 - files where a [possible secret](#secret-scan-and-redaction) was found, marked with a **⚠** badge.
 
-Everything else is checked by default. `node_modules/`, `.git/` and `.tree/` are skipped during the scan itself, so they never appear in the picker and large repos open quickly.
+Everything else is checked by default. `node_modules/`, `.git/` and `.tree/` are skipped during the scan itself, so they never appear in the picker and large repos open quickly. Their names (`node_modules/`, `.git/`) are still listed in the Workspace Tree; `.tree/` is not.
 
 The picker is fully offline: it loads no fonts or other network resources, uses your VS Code fonts, and runs under a restrictive Content-Security-Policy that blocks all network access.
 
@@ -121,7 +121,7 @@ Tree Mapper reads your `.gitignore` files so the picker and the Workspace Tree m
 
 - It collects the `.gitignore` of the scanned folder, its parent folders up to the repo root (the folder with `.git`), and nested ones inside.
 - Each `.gitignore` applies only to paths under its own folder, matched relative to that folder. `!` negation works as in git.
-- Ignored files start **unchecked** in the picker (same as built-in ignores) and are hidden from the Workspace Tree.
+- Ignored files start **unchecked** in the picker (same as built-in ignores) and are listed in the Workspace Tree by name only (a folder as `name/`, with nothing under it).
 - Rules are applied in this order, last match wins: `.gitignore` → built-in list → your `treemapper.defaultIgnorePatterns`. So a `!` line in a `.gitignore` can never re-include a protected secret file.
 - An unreadable `.gitignore` is skipped silently.
 
@@ -168,13 +168,24 @@ Links to every section present in the snapshot (`Workspace Tree`, `Snapshot Tree
 
 ### Workspace Tree
 
-Reflects the full repository structure, excluding paths matched by your `.gitignore` files, the [built-in ignore list](docs/IGNORE_PATTERNS.md) and anything added via `treemapper.defaultIgnorePatterns`. It hides exactly the files the picker leaves unchecked by default, regardless of what you chose to include in the snapshot.
+Shows the full repository structure, so you can see where every file lives. Paths matched by your `.gitignore` files, the [built-in ignore list](docs/IGNORE_PATTERNS.md) and anything added via `treemapper.defaultIgnorePatterns` are listed **by name only**, and their contents are never included:
+
+- an ignored **file** (`.env`, `server.pem`) is listed like any other file
+- an ignored **folder** (`node_modules/`, `dist/`, `.git/`) is listed as `name/` with nothing under it
+- folders always end with `/`
+- the tool's own `.tree/` folder is never listed
+
+The tree is the same whatever you chose to include in the snapshot.
 
 ```
 my-project/
+├── .git/
+├── dist/
+├── node_modules/
 ├── src/
 │   ├── index.ts
 │   └── utils.ts
+├── .env
 ├── package.json
 └── README.md
 ```
@@ -195,7 +206,7 @@ All links are plain markdown heading anchors (no HTML), generated and de-duplica
 
 ### Structure-only snapshot
 
-If you generate with **no files selected**, the snapshot contains only a `# Project Structure` title and the project tree (the same tree as the Workspace Tree, excluding default-ignored paths) — no header stats, index, or file contents. An empty selection is not saved as your "last selection", so **Restore last** still brings back your previous real selection.
+If you generate with **no files selected**, the snapshot contains only a `# Project Structure` title and the project tree (the same tree as the Workspace Tree) — no header stats, index, or file contents. An empty selection is not saved as your "last selection", so **Restore last** still brings back your previous real selection.
 
 ### Code fences
 
@@ -221,7 +232,7 @@ Because `.tree/` is ignored, your snapshots, `last-selection.json` and `presets.
 |---|---|---|
 | `treemapper.maxFileSizeKB` | `2048` | Files larger than this (in KB) are excluded from snapshot contents even if checked in the picker. They appear in the `Files skipped` count. |
 | `treemapper.keepLastSnapshots` | `10` | Number of recent snapshots to retain in `.tree/`. Oldest are deleted automatically after each run. |
-| `treemapper.respectGitignore` | `true` | Uncheck files matched by `.gitignore` (the scanned folder, its parents up to the repo root, and nested `.gitignore` files) in the picker and hide them from the Workspace Tree. Built-in secret protection always stays on. |
+| `treemapper.respectGitignore` | `true` | Uncheck files matched by `.gitignore` (the scanned folder, its parents up to the repo root, and nested `.gitignore` files) in the picker; the Workspace Tree still lists them by name. Built-in secret protection always stays on. |
 | `treemapper.redactSecrets` | `true` | Replace detected secrets with `[REDACTED]` in the snapshot, even if you tick the file. Files with findings start unchecked and show a ⚠ badge. |
 | `treemapper.defaultIgnorePatterns` | `[]` | Your **own extra** glob patterns to uncheck by default in the file picker, on top of the built-in secrets/credentials list in [built-in list](docs/IGNORE_PATTERNS.md). `.tree/` and the built-in list are always excluded and can't be turned off from here. Duplicates and entries already in the built-in list are removed automatically. |
 

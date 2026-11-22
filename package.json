@@ -2,7 +2,7 @@
     "name": "tree-mapper",
     "displayName": "Tree Mapper",
     "description": "Generate a complete Markdown snapshot of any folder in your VS Code workspace — including a full directory tree and every file's source code.",
-    "version": "2.8.0",
+    "version": "2.9.0",
     "publisher": "MrDeveloperJIS",
     "engines": {
         "vscode": "^1.85.0"
@@ -59,7 +59,7 @@
                 "treemapper.respectGitignore": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Uncheck files matched by .gitignore (the scanned folder, its parents up to the repo root, and nested .gitignore files) in the file picker and hide them from the Workspace Tree. Built-in secret protection always stays on."
+                    "description": "Uncheck files matched by .gitignore (the scanned folder, its parents up to the repo root, and nested .gitignore files) in the file picker; the Workspace Tree still lists them by name. Built-in secret protection always stays on."
                 },
                 "treemapper.redactSecrets": {
                     "type": "boolean",

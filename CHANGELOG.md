@@ -2,6 +2,20 @@
 
 All notable changes to Tree Mapper are documented here.
 
+## v2.9.0 — 2026-11-22
+
+### Changed
+
+- **The Workspace Tree now lists ignored files and folders by name** — Before, anything the picker leaves unchecked by default (`.env`, `*.pem`, `dist/`, `.gitignore` matches, …) disappeared from the tree, so you couldn't tell where a file lived. Now an ignored file is listed like any other file, and an ignored folder is listed as `name/` with nothing under it. Contents are still never included. This also applies to `node_modules/` and `.git/` at any depth (the scan still never opens them). The tool's own `.tree/` folder is not listed.
+- **Folders end with `/`** in both the Workspace Tree and the Snapshot Tree, and empty folders are now shown.
+- `scanWorkspace` also returns `prunedDirs` (the `node_modules` / `.git` folders it skipped), and `buildTree(files, allEntries, prunedDirs)` takes it as an optional third argument.
+
+### Fixed
+
+- **A file named `constructor`, `__proto__` or `toString`** could break tree rendering. The tree is now built with `Map`s.
+
+---
+
 ## v2.8.0 — 2026-11-06
 
 Everything in this release works offline: no network calls and no new dependencies.

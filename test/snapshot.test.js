@@ -77,15 +77,84 @@ test('scanner prunes node_modules and .git but keeps normal files', async () => 
     assert.ok(!rels.some((r) => r.startsWith('.git')));
     const env = res.entries.find((e) => e.rel === '.env');
     assert.ok(env && env.ignoredByDefault, '.env is listed but unchecked by default');
+    // The pruned folders are never opened, but their names are still reported.
+    assert.deepStrictEqual([...res.prunedDirs].sort(), ['.git', 'node_modules']);
 });
 
-test('workspace tree omits default-ignored files', async () => {
-    const root = makeProject({ 'src/a.js': 'x', '.env': 's' });
+test('scanner reports nested node_modules by name but never lists .tree', async () => {
+    const root = makeProject({
+        'packages/app/node_modules/x/y.js': 'x',
+        'packages/app/src/a.js': 'x',
+        '.tree/old.md': 'x',
+    });
     const res = await scanWorkspace(root, 2048, [...BUILTIN_IGNORE_PATTERNS]);
-    const { workspaceTreeLines } = buildTree([], res.entries);
-    const text = workspaceTreeLines.join('\n');
-    assert.ok(text.includes('a.js'));
-    assert.ok(!text.includes('.env'));
+    assert.deepStrictEqual(res.prunedDirs, ['packages/app/node_modules']);
+});
+
+test('workspace tree lists default-ignored files and folders by name only', async () => {
+    const root = makeProject({
+        'src/a.js': 'x',
+        '.env': 's',
+        'keys/server.pem': 'k',
+        'dist/bundle.js': 'x',
+        'node_modules/pkg/index.js': 'x',
+        '.git/HEAD': 'ref',
+        '.tree/old.md': 'x',
+    });
+    const res = await scanWorkspace(root, 2048, [...BUILTIN_IGNORE_PATTERNS]);
+    const text = buildTree([], res.entries, res.prunedDirs).workspaceTreeLines.join('\n');
+
+    // Names are shown: ignored folders as `name/`, ignored files as plain names.
+    assert.ok(/a\.js$/m.test(text));
+    assert.ok(/\.env$/m.test(text), '.env is listed by name');
+    assert.ok(/server\.pem$/m.test(text), 'ignored file inside a normal folder is listed');
+    assert.ok(/dist\/$/m.test(text), 'ignored folder is listed with a trailing slash');
+    assert.ok(/node_modules\/$/m.test(text));
+    assert.ok(/\.git\/$/m.test(text));
+    assert.ok(!text.includes('(ignored)'), 'no marker is added');
+
+    // Contents of ignored folders and the tool's own .tree/ folder stay out.
+    assert.ok(!text.includes('bundle.js'));
+    assert.ok(!text.includes('index.js'));
+    assert.ok(!text.includes('HEAD'));
+    assert.ok(!text.includes('old.md'));
+    assert.ok(!text.includes('.tree'));
+});
+
+test('nested node_modules shows only its folder name', async () => {
+    const root = makeProject({
+        'packages/app/node_modules/x/y.js': 'x',
+        'packages/app/src/a.js': 'x',
+    });
+    const res = await scanWorkspace(root, 2048, [...BUILTIN_IGNORE_PATTERNS]);
+    const lines = buildTree([], res.entries, res.prunedDirs).workspaceTreeLines;
+    const text = lines.join('\n');
+    assert.ok(/packages\/$/m.test(text));
+    assert.ok(/app\/$/m.test(text));
+    assert.ok(/node_modules\/$/m.test(text));
+    assert.ok(!text.includes('y.js'));
+    assert.ok(!/\bx\/?$/m.test(text), 'package folders inside node_modules are not listed');
+});
+
+test('folders end with a slash in both trees', () => {
+    const { workspaceTreeLines, snapshotTreeLines } = buildTree(
+        ['src/a.js'],
+        [
+            { rel: 'src', isDir: true },
+            { rel: 'src/a.js', isDir: false },
+            { rel: 'README.md', isDir: false },
+        ]
+    );
+    assert.deepStrictEqual(workspaceTreeLines, ['├── src/', '│   └── a.js', '└── README.md']);
+    assert.deepStrictEqual(snapshotTreeLines, ['└── src/', '    └── a.js']);
+});
+
+test('tree builder copes with file names that match object internals', () => {
+    const { snapshotTreeLines } = buildTree(['constructor', '__proto__', 'src/toString'], []);
+    const text = snapshotTreeLines.join('\n');
+    assert.ok(text.includes('constructor'));
+    assert.ok(text.includes('__proto__'));
+    assert.ok(text.includes('toString'));
 });
 
 test('picker HTML cannot be broken out of by a hostile file name', () => {
